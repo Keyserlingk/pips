@@ -1,6 +1,9 @@
-export const S = 100;
+import { useId } from 'react';
+import { PIP_OFFSET, PIP_R, S } from './geometry';
 
-const D = S * 0.24;
+export { S };
+
+const D = PIP_OFFSET;
 const SPOTS: Record<string, [number, number]> = {
   TL: [-D, -D], TC: [0, -D], TR: [D, -D],
   ML: [-D, 0], C: [0, 0], MR: [D, 0],
@@ -26,7 +29,7 @@ function Pips({ cx, cy, n, horizontal }: { cx: number; cy: number; n: number; ho
         const [dx, dy] = SPOTS[spot];
         // Rotate the pattern on horizontal dominoes so 6 reads as 2 rows of 3.
         const [x, y] = horizontal ? [dy, dx] : [dx, dy];
-        return <circle key={spot} cx={cx + x} cy={cy + y} r={S * 0.085} fill="var(--pip)" />;
+        return <circle key={spot} cx={cx + x} cy={cy + y} r={PIP_R} fill="var(--pip)" />;
       })}
     </>
   );
@@ -41,6 +44,8 @@ export function DominoShape({
   second,
   inset = 6,
   opacity,
+  washFirst,
+  washSecond,
 }: {
   x: number;
   y: number;
@@ -49,21 +54,34 @@ export function DominoShape({
   second: number;
   inset?: number;
   opacity?: number;
+  /** Faint tint per half (a CSS colour), showing which region it lies in. */
+  washFirst?: string;
+  washSecond?: string;
 }) {
+  const clipId = useId();
   const w = horizontal ? 2 * S : S;
   const h = horizontal ? S : 2 * S;
+  const body = { x: x + inset, y: y + inset, width: w - 2 * inset, height: h - 2 * inset, rx: 16 };
+  const washes = [
+    { color: washFirst, x, y },
+    { color: washSecond, x: horizontal ? x + S : x, y: horizontal ? y : y + S },
+  ].filter((wsh) => wsh.color);
   return (
     <g opacity={opacity}>
-      <rect
-        x={x + inset}
-        y={y + inset}
-        width={w - 2 * inset}
-        height={h - 2 * inset}
-        rx={16}
-        fill="var(--domino-bg)"
-        stroke="var(--domino-border)"
-        strokeWidth={5}
-      />
+      <rect {...body} fill="var(--domino-bg)" />
+      {washes.length > 0 && (
+        <>
+          <clipPath id={clipId}>
+            <rect {...body} />
+          </clipPath>
+          <g clipPath={`url(#${clipId})`} style={{ opacity: 'var(--wash-opacity)' }}>
+            {washes.map((wsh, i) => (
+              <rect key={i} x={wsh.x} y={wsh.y} width={S} height={S} fill={wsh.color} />
+            ))}
+          </g>
+        </>
+      )}
+      <rect {...body} fill="none" stroke="var(--domino-border)" strokeWidth={5} />
       {horizontal ? (
         <line x1={x + S} y1={y + 20} x2={x + S} y2={y + S - 20} stroke="var(--domino-border)" strokeWidth={4} strokeLinecap="round" />
       ) : (

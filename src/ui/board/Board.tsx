@@ -1,9 +1,10 @@
 import type React from 'react';
 import type { Cell, Domino, Region } from '../../model/types';
 import { type RegionStatus, constraintLabel, key } from '../../model/cells';
-import { DominoShape, S } from './DominoShape';
+import { DominoShape } from './DominoShape';
+import { BADGE_OK_STROKE, BADGE_STROKE, S, badgeShape } from './geometry';
 
-export const PAD = 36;
+export const PAD = 48;
 
 export interface BoardDomino {
   id: string | number;
@@ -49,7 +50,7 @@ export function cellPixels(svg: SVGSVGElement | null, width: number, height: num
   return S * Math.min(rect.width / (width * S + 2 * PAD), rect.height / (height * S + 2 * PAD));
 }
 
-const INSET = 8;
+const INSET = 13;
 
 /** Dashed outline segments, drawn slightly inside the region. */
 function outline(region: Region): [number, number, number, number][] {
@@ -84,6 +85,10 @@ export function Board(props: Props) {
   const active = new Set(cells.map(key));
   const regionOf = new Map<string, Region>();
   regions.forEach((reg) => reg.cells.forEach((c) => regionOf.set(key(c), reg)));
+  const wash = (c: Cell) => {
+    const reg = regionOf.get(key(c));
+    return reg ? `var(--region-${reg.color}-fill)` : undefined;
+  };
   const vw = width * S + 2 * PAD;
   const vh = height * S + 2 * PAD;
 
@@ -118,9 +123,28 @@ export function Board(props: Props) {
           />
         );
       })}
+      {dominoes.map((d) => {
+        const horizontal = d.a.r === d.b.r;
+        const aFirst = horizontal ? d.a.c < d.b.c : d.a.r < d.b.r;
+        const tl = aFirst ? d.a : d.b;
+        return (
+          <DominoShape
+            key={d.id}
+            x={tl.c * S}
+            y={tl.r * S}
+            horizontal={horizontal}
+            first={aFirst ? d.pips[0] : d.pips[1]}
+            second={aFirst ? d.pips[1] : d.pips[0]}
+            opacity={d.faded ? 0.55 : undefined}
+            washFirst={wash(tl)}
+            washSecond={wash(aFirst ? d.b : d.a)}
+          />
+        );
+      })}
       {regions.map((reg) => (
         <g
           key={reg.id}
+          pointerEvents="none"
           stroke={`var(--region-${reg.color}-stroke)`}
           strokeWidth={reg.id === props.selectedRegion ? 7 : 4}
           strokeDasharray={reg.id === props.selectedRegion ? undefined : '11 9'}
@@ -136,22 +160,6 @@ export function Board(props: Props) {
           const [r, c] = k.split(',').map(Number);
           return <rect key={`h${k}`} x={c * S + 3} y={r * S + 3} width={S - 6} height={S - 6} rx={12} className="cell-highlight" />;
         })}
-      {dominoes.map((d) => {
-        const horizontal = d.a.r === d.b.r;
-        const aFirst = horizontal ? d.a.c < d.b.c : d.a.r < d.b.r;
-        const tl = aFirst ? d.a : d.b;
-        return (
-          <DominoShape
-            key={d.id}
-            x={tl.c * S}
-            y={tl.r * S}
-            horizontal={horizontal}
-            first={aFirst ? d.pips[0] : d.pips[1]}
-            second={aFirst ? d.pips[1] : d.pips[0]}
-            opacity={d.faded ? 0.55 : undefined}
-          />
-        );
-      })}
       {regions.map((reg) => {
         const label = constraintLabel(reg.constraint);
         if (!label || !reg.cells.length) return null;
@@ -159,35 +167,34 @@ export function Board(props: Props) {
         const st = status[reg.id];
         const fill = st === 'bad' ? 'var(--bad)' : `var(--region-${reg.color}-stroke)`;
         const stroke = st === 'ok' ? 'var(--ok)' : 'var(--surface)';
-        const strokeWidth = st === 'ok' ? 7 : 4;
-        // Short labels sit in a diamond; longer ones (extra constraints) in a pill.
-        const pill = label.length > 3;
-        const pw = 24 + label.length * 15;
-        const cx = pill ? (anchor.c + 1) * S - pw / 2 + 8 : (anchor.c + 1) * S - 22;
-        const cy = (anchor.r + 1) * S - 8;
-        const h = label.length > 2 ? 36 : 30;
+        const strokeWidth = st === 'ok' ? BADGE_OK_STROKE : BADGE_STROKE;
+        // Centred on the anchor cell's bottom-right grid corner, clear of every pip.
+        const cx = (anchor.c + 1) * S;
+        const cy = (anchor.r + 1) * S;
+        const shape = badgeShape(label);
         return (
           <g key={`b${reg.id}`} className="badge" pointerEvents="none">
-            {pill ? (
-              <rect x={cx - pw / 2} y={cy - 22} width={pw} height={44} rx={22} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+            {shape.kind === 'pill' ? (
+              <rect
+                x={cx - shape.halfW}
+                y={cy - shape.halfH}
+                width={2 * shape.halfW}
+                height={2 * shape.halfH}
+                rx={shape.halfH}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+              />
             ) : (
               <polygon
-                points={`${cx},${cy - h} ${cx + h},${cy} ${cx},${cy + h} ${cx - h},${cy}`}
+                points={`${cx},${cy - shape.half} ${cx + shape.half},${cy} ${cx},${cy + shape.half} ${cx - shape.half},${cy}`}
                 strokeLinejoin="round"
                 fill={fill}
                 stroke={stroke}
                 strokeWidth={strokeWidth}
               />
             )}
-            <text
-              x={cx}
-              y={cy}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={pill ? 24 : label.length > 2 ? 22 : label.length > 1 ? 26 : 32}
-              fontWeight={800}
-              fill="#fff"
-            >
+            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={shape.fontSize} fontWeight={800} fill="#fff">
               {label}
             </text>
           </g>

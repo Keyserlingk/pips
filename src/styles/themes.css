@@ -19,6 +19,8 @@
   --domino-bg: #ffffff;
   --domino-border: #2b2b2b;
   --pip: #2b2b2b;
+  /* How strongly a placed domino half takes its region's colour. */
+  --wash-opacity: 0.4;
   --ok: #3a9d5d;
   --bad: #d64545;
 
@@ -45,6 +47,7 @@
   --domino-bg: #f2efe8;
   --domino-border: #0d0e10;
   --pip: #16181d;
+  --wash-opacity: 0.3;
   --ok: #5fcf88;
   --bad: #ff6b6b;
 
@@ -71,6 +74,7 @@
   --domino-bg: #fffef9;
   --domino-border: #1d3340;
   --pip: #1d3340;
+  --wash-opacity: 0.4;
   --ok: #2c9a6a;
   --bad: #d2493f;
 
