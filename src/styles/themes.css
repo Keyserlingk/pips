@@ -1,0 +1,85 @@
+/*
+ * Themes. Every colour in the app comes from these variables.
+ * To add a theme: copy a block, change the selector to [data-theme="yours"],
+ * adjust the values and register it in src/styles/themes.ts.
+ */
+
+:root,
+[data-theme='classic'] {
+  --font: ui-rounded, 'SF Pro Rounded', 'Nunito', 'Segoe UI', system-ui, sans-serif;
+  --bg: #f6f1e7;
+  --surface: #fffdf8;
+  --text: #2b2b2b;
+  --muted: #7a746a;
+  --border: #e3dccd;
+  --accent: #7b5ea7;
+  --accent-text: #ffffff;
+  --cell-bg: #ebe3d3;
+  --cell-inactive: #d9d1c0;
+  --domino-bg: #ffffff;
+  --domino-border: #2b2b2b;
+  --pip: #2b2b2b;
+  --ok: #3a9d5d;
+  --bad: #d64545;
+
+  --region-0-fill: #f6c6d6;  --region-0-stroke: #c2507a;
+  --region-1-fill: #bfe3dd;  --region-1-stroke: #2f8f80;
+  --region-2-fill: #fbd8b0;  --region-2-stroke: #c8742a;
+  --region-3-fill: #d8cdf0;  --region-3-stroke: #7357b5;
+  --region-4-fill: #cfe6b8;  --region-4-stroke: #5c9230;
+  --region-5-fill: #bcd6f2;  --region-5-stroke: #3a6fb0;
+  --region-6-fill: #f4e6a6;  --region-6-stroke: #a88a10;
+  --region-7-fill: #e6c9b8;  --region-7-stroke: #96583a;
+}
+
+[data-theme='midnight'] {
+  --bg: #16181d;
+  --surface: #1f232a;
+  --text: #ece8e1;
+  --muted: #9a958c;
+  --border: #31363f;
+  --accent: #b59cf0;
+  --accent-text: #16181d;
+  --cell-bg: #2b3038;
+  --cell-inactive: #252930;
+  --domino-bg: #f2efe8;
+  --domino-border: #0d0e10;
+  --pip: #16181d;
+  --ok: #5fcf88;
+  --bad: #ff6b6b;
+
+  --region-0-fill: #5a2f42;  --region-0-stroke: #f08cb4;
+  --region-1-fill: #234a45;  --region-1-stroke: #6fd6c4;
+  --region-2-fill: #5a3d1f;  --region-2-stroke: #f5ac62;
+  --region-3-fill: #3b3159;  --region-3-stroke: #b59cf0;
+  --region-4-fill: #344a24;  --region-4-stroke: #9ed36b;
+  --region-5-fill: #23395a;  --region-5-stroke: #7fb2f0;
+  --region-6-fill: #514718;  --region-6-stroke: #ecd25c;
+  --region-7-fill: #4d3326;  --region-7-stroke: #d99a78;
+}
+
+[data-theme='seaside'] {
+  --bg: #eaf3f6;
+  --surface: #ffffff;
+  --text: #1d3340;
+  --muted: #5f7884;
+  --border: #cfe0e7;
+  --accent: #1f7a99;
+  --accent-text: #ffffff;
+  --cell-bg: #d8e7ec;
+  --cell-inactive: #cddde3;
+  --domino-bg: #fffef9;
+  --domino-border: #1d3340;
+  --pip: #1d3340;
+  --ok: #2c9a6a;
+  --bad: #d2493f;
+
+  --region-0-fill: #ffd3c9;  --region-0-stroke: #d0573c;
+  --region-1-fill: #b9ecea;  --region-1-stroke: #1c918c;
+  --region-2-fill: #ffe6a8;  --region-2-stroke: #c49112;
+  --region-3-fill: #cfd8ff;  --region-3-stroke: #4b5fc4;
+  --region-4-fill: #d2efc2;  --region-4-stroke: #4b9a2c;
+  --region-5-fill: #a9d8f0;  --region-5-stroke: #1f7a99;
+  --region-6-fill: #f6cbe8;  --region-6-stroke: #b04a92;
+  --region-7-fill: #e0d6c8;  --region-7-stroke: #8a6d47;
+}

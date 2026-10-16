@@ -1,0 +1,53 @@
+import type { Cell, Puzzle } from './types';
+
+const LIB = 'pips.library';
+const QUICK = 'pips.quick';
+const PROGRESS = 'pips.progress.';
+const THEME = 'pips.theme';
+
+function read<T>(k: string): T | null {
+  try {
+    const raw = localStorage.getItem(k);
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
+}
+function write(k: string, v: unknown) {
+  try {
+    if (v === null) localStorage.removeItem(k);
+    else localStorage.setItem(k, JSON.stringify(v));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+export const loadLibrary = (): Puzzle[] => read<Puzzle[]>(LIB) ?? [];
+export const getPuzzle = (id: string) => loadLibrary().find((p) => p.id === id) ?? null;
+export function savePuzzle(p: Puzzle) {
+  const lib = loadLibrary();
+  const i = lib.findIndex((x) => x.id === p.id);
+  if (i >= 0) lib[i] = p;
+  else lib.unshift(p);
+  write(LIB, lib);
+}
+export function deletePuzzle(id: string) {
+  write(LIB, loadLibrary().filter((p) => p.id !== id));
+  write(PROGRESS + id, null);
+}
+
+export const loadQuick = () => read<Puzzle>(QUICK);
+export const saveQuick = (p: Puzzle) => write(QUICK, p);
+
+export type Orient = 0 | 1 | 2 | 3;
+export interface PlayState {
+  placed: Record<number, { anchor: Cell; orient: Orient }>;
+  tray: Record<number, Orient>;
+  elapsed: number;
+  solved: boolean;
+}
+export const loadProgress = (id: string) => read<PlayState>(PROGRESS + id);
+export const saveProgress = (id: string, s: PlayState | null) => write(PROGRESS + id, s);
+
+export const loadTheme = () => read<string>(THEME) ?? 'classic';
+export const saveTheme = (t: string) => write(THEME, t);
