@@ -114,7 +114,7 @@ export function Home({ go }: { go: (hash: string) => void }) {
                   <button className="btn ghost" onClick={() => go(`#/edit/${p.id}`)}>
                     Edit
                   </button>
-                  <button className="btn ghost" onClick={() => navigator.clipboard?.writeText(shareUrl(p))}>
+                  <button className="btn ghost" onClick={async () => navigator.clipboard?.writeText(await shareUrl(p))}>
                     Copy link
                   </button>
                   <button

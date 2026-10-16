@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Cell, Puzzle } from '../../model/types';
 import { DIRS, add, constraintRule, evaluate, key, ruleKey, sameCell } from '../../model/cells';
-import { type Orient, type PlayState, loadProgress, saveProgress } from '../../model/storage';
-import { shareUrl } from '../../model/serialize';
+import { type Orient, type PlayState, getPuzzle, loadProgress, savePuzzle, saveProgress } from '../../model/storage';
+import { samePuzzle, shareUrl } from '../../model/serialize';
+import { runEngine } from '../../engine/client';
 import { Board, type BoardDomino, cellAt, cellPixels } from '../board/Board';
 import { DominoShape, S } from '../board/DominoShape';
 
@@ -24,7 +25,30 @@ interface DragInfo {
   moved: boolean;
 }
 
-export function Play({ puzzle, onHome, onEdit }: { puzzle: Puzzle; onHome: () => void; onEdit?: () => void }) {
+type SavedState = 'none' | 'saved' | 'changed';
+
+/** Is this puzzle in the library, and is the stored copy the same as this one? */
+function libraryState(puzzle: Puzzle): SavedState {
+  const stored = getPuzzle(puzzle.id);
+  return !stored ? 'none' : samePuzzle(stored, puzzle) ? 'saved' : 'changed';
+}
+
+export function Play({
+  puzzle,
+  source,
+  onHome,
+  onEdit,
+  onRemix,
+}: {
+  puzzle: Puzzle;
+  /** Where the puzzle came from: the library, a random puzzle, or a share link. */
+  source: 'local' | 'quick' | 'shared';
+  onHome: () => void;
+  onEdit?: () => void;
+  onRemix?: () => void;
+}) {
+  const [savedState, setSavedState] = useState<SavedState>(() => libraryState(puzzle));
+  const [solution, setSolution] = useState(puzzle.solution);
   const [st, setSt] = useState<PlayState>(() => loadProgress(puzzle.id) ?? fresh());
   const [drag, setDrag] = useState<{ idx: number; half: 0 | 1; orient: Orient; x: number; y: number; px: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -162,17 +186,36 @@ export function Play({ puzzle, onHome, onEdit }: { puzzle: Puzzle; onHome: () =>
       return { id: i, a, b, pips: puzzle.dominoes[Number(i)] };
     });
 
-  const reveal = () => {
-    if (!puzzle.solution || !confirm('Reveal the solution?')) return;
+  const flash = (text: string) => {
+    setToast(text);
+    setTimeout(() => setToast(null), 1800);
+  };
+
+  const reveal = async () => {
+    if (!confirm('Reveal the solution?')) return;
+    let sol = solution;
+    if (!sol) {
+      // Shared links carry no answer; work it out here.
+      setToast('Working out the answer…');
+      try {
+        const res = await runEngine('verify', puzzle, puzzle.dominoes, puzzle.options.maxPip).promise;
+        sol = res.ok && res.solution.length ? res.solution : undefined;
+      } catch {
+        sol = undefined;
+      }
+      setToast(null);
+      if (!sol) return flash('Could not find the answer');
+      setSolution(sol);
+    }
     const used = new Set<number>();
     const placed: PlayState['placed'] = {};
-    for (const sol of puzzle.solution) {
+    for (const sol1 of sol) {
       const idx = puzzle.dominoes.findIndex(
-        (d, i) => !used.has(i) && ((d[0] === sol.pips[0] && d[1] === sol.pips[1]) || (d[0] === sol.pips[1] && d[1] === sol.pips[0])),
+        (d, i) => !used.has(i) && ((d[0] === sol1.pips[0] && d[1] === sol1.pips[1]) || (d[0] === sol1.pips[1] && d[1] === sol1.pips[0])),
       );
       if (idx < 0) continue;
       used.add(idx);
-      const [anchor, other] = puzzle.dominoes[idx][0] === sol.pips[0] ? [sol.a, sol.b] : [sol.b, sol.a];
+      const [anchor, other] = puzzle.dominoes[idx][0] === sol1.pips[0] ? [sol1.a, sol1.b] : [sol1.b, sol1.a];
       const orient = DIRS.findIndex((d) => sameCell(add(anchor, d), other)) as Orient;
       placed[idx] = { anchor, orient };
     }
@@ -186,12 +229,19 @@ export function Play({ puzzle, onHome, onEdit }: { puzzle: Puzzle; onHome: () =>
 
   const share = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl(puzzle));
-      setToast('Link copied');
+      await navigator.clipboard.writeText(await shareUrl(puzzle));
+      flash('Link copied');
     } catch {
-      setToast('Could not copy link');
+      flash('Could not copy link');
     }
-    setTimeout(() => setToast(null), 1800);
+  };
+
+  const save = () => {
+    if (savedState === 'changed' && !confirm('Your saved copy of this puzzle is different. Replace it with this version?')) return;
+    // Keep a solution the stored copy already had (share links carry none).
+    savePuzzle({ ...puzzle, solution: solution ?? getPuzzle(puzzle.id)?.solution });
+    setSavedState('saved');
+    flash('Saved to My puzzles');
   };
 
   return (
@@ -210,18 +260,27 @@ export function Play({ puzzle, onHome, onEdit }: { puzzle: Puzzle; onHome: () =>
         <button className="btn ghost" onClick={reset}>
           Reset
         </button>
-        {puzzle.solution && (
-          <button className="btn ghost" onClick={reveal}>
-            Reveal
-          </button>
-        )}
+        <button className="btn ghost" onClick={reveal}>
+          Reveal
+        </button>
         <button className="btn ghost" onClick={share}>
           Share
         </button>
-        {onEdit && (
+        {source !== 'local' && (
+          <button className="btn" onClick={save} disabled={savedState === 'saved'}>
+            {savedState === 'none' ? 'Save to My puzzles' : savedState === 'changed' ? 'Replace my saved copy' : 'Saved ✓'}
+          </button>
+        )}
+        {onEdit ? (
           <button className="btn ghost" onClick={onEdit}>
             Edit
           </button>
+        ) : (
+          onRemix && (
+            <button className="btn ghost" onClick={onRemix} title="Open a copy in the editor">
+              Remix
+            </button>
+          )
         )}
       </div>
 

@@ -34,6 +34,8 @@ export interface LogicResult {
   lookaheads: number;
   /** The number deduced for each cell (in `cells` order), -1 if unknown. */
   values: number[];
+  /** The level at which each cell's number was worked out (5 = never). */
+  knownAt: number[];
   grade: Difficulty;
 }
 
@@ -384,8 +386,12 @@ export function gradeLogic(problem: LogicProblem): LogicResult {
   // Solved once every cell's number is known; which way identical numbers pair
   // up doesn't matter to the player (the win check only looks at the rules).
   const determined = () => s.cand.every((v) => (v & (v - 1)) === 0);
+  const knownAt = new Array(m.n).fill(5);
+  const stamp = () => s.cand.forEach((v, i) => knownAt[i] === 5 && (v & (v - 1)) === 0 && (knownAt[i] = level));
   for (;;) {
-    if (!propagate(m, s, 1)) break;
+    const ok = propagate(m, s, 1);
+    stamp();
+    if (!ok) break;
     if (determined()) break;
     const before = clone(s);
     if (!propagate(m, s, 2)) break;
@@ -402,7 +408,7 @@ export function gradeLogic(problem: LogicProblem): LogicResult {
     break;
   }
   const solved = determined();
-  return { solved, level, lookaheads, values: Array.from(s.cand, (v) => (v & (v - 1) ? -1 : Math.log2(v))), grade: gradeOf(level, lookaheads) };
+  return { solved, level, lookaheads, knownAt, values: Array.from(s.cand, (v) => (v & (v - 1) ? -1 : Math.log2(v))), grade: gradeOf(level, lookaheads) };
 }
 
 function changedState(a: State, b: State) {

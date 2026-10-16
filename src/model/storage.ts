@@ -2,6 +2,7 @@ import type { Cell, Puzzle } from './types';
 
 const LIB = 'pips.library';
 const QUICK = 'pips.quick';
+const REMIX = 'pips.remix';
 const PROGRESS = 'pips.progress.';
 const THEME = 'pips.theme';
 
@@ -38,6 +39,10 @@ export function deletePuzzle(id: string) {
 
 export const loadQuick = () => read<Puzzle>(QUICK);
 export const saveQuick = (p: Puzzle) => write(QUICK, p);
+
+/** A puzzle handed to the editor as the starting point for a copy. */
+export const loadRemix = () => read<Puzzle>(REMIX);
+export const saveRemix = (p: Puzzle) => write(REMIX, p);
 
 export type Orient = 0 | 1 | 2 | 3;
 export interface PlayState {

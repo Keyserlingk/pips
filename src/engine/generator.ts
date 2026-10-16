@@ -480,6 +480,55 @@ function uniquify(
   return res;
 }
 
+/**
+ * Makes a unique puzzle easier until the logic solver grades it at `target` or
+ * below, by turning regions it couldn't work out into exact sums or giving
+ * single unconstrained cells their number. The logic solver only makes sound
+ * deductions, so a puzzle it finishes is unique; a change after which it can't
+ * finish is undone (replacing a rule can loosen it). Returns the final grade.
+ */
+function ease(
+  W: number,
+  H: number,
+  cells: number[],
+  regs: EReg[],
+  values: number[],
+  dominoes: Domino[],
+  target: Difficulty,
+): Difficulty {
+  const exact = (cs: number[]): Constraint => ({ kind: 'sum', op: '=', value: cs.reduce((t, c) => t + values[c], 0) });
+  const grade = () => {
+    const regionOf = new Array(W * H).fill(-1);
+    regs.forEach((r, i) => r.cells.forEach((c) => (regionOf[c] = i)));
+    return gradeLogic({ width: W, height: H, cells, regionOf, constraints: regs.map((r) => r.constraint), dominoes });
+  };
+  // Deduction level the target grade allows (easy 1, medium 2, hard 3).
+  const allowed = Math.min(3, DIFFICULTIES.indexOf(target) + 1);
+  let res = grade();
+  const original = regs.map((r) => ({ ...r }));
+  for (let step = 0; step < 12 && DIFFICULTIES.indexOf(res.grade) > DIFFICULTIES.indexOf(target); step++) {
+    // Cells that needed harder reasoning than the target allows.
+    const unknown = cells.filter((_, i) => res.knownAt[i] > allowed);
+    // Prefer making an existing region exact; otherwise give a free cell its number.
+    const reg = regs.find(
+      (r) => !(r.constraint.kind === 'sum' && r.constraint.op === '=') && r.cells.some((c) => unknown.includes(c)),
+    );
+    if (reg) reg.constraint = exact(reg.cells);
+    else {
+      const free = unknown.find((c) => !regs.some((r) => r.cells.includes(c)));
+      if (free === undefined) break;
+      regs.push({ id: newId(), color: 0, cells: [free], constraint: exact([free]) });
+    }
+    res = grade();
+  }
+  if (!res.solved) {
+    // Not provably unique any more: keep the puzzle as it was.
+    regs.splice(0, regs.length, ...original);
+    return grade().grade;
+  }
+  return res.grade;
+}
+
 // ------------------------------------------------------------- conversions
 
 function toRegions(W: number, regs: EReg[]): Region[] {
@@ -554,7 +603,10 @@ export function generate(layout: Layout, opts: GenOptions, deadline = Date.now()
       ? uniquify(W, H, cells, regs, values, tray, opts.maxPip, opts.mode === 'auto', rng, opts.extras, deadline, opts.difficulty !== 'expert' || attempt % 2 === 1 || (!best && Date.now() > late))
       : solve(problem(W, H, cells, regs, tray.types, tray.counts, opts.maxPip), { limit: 2, nodeLimit: NODE_LIMIT, distinctValues: true });
     if (opts.requireUnique && (res.aborted || res.solutions.length !== 1)) continue;
-    const stats = statsFrom(res, W, H, cells, regs, doms);
+    let stats = statsFrom(res, W, H, cells, regs, doms);
+    // Too hard for the target: add clues where the logic solver got stuck.
+    if (stats.solutions === 1 && DIFFICULTIES.indexOf(stats.rating) > target)
+      stats = { ...stats, rating: ease(W, H, cells, regs, values, doms, opts.difficulty) };
 
     const solution = placementsFrom(W, cells, values, partner);
     const result = {
@@ -656,25 +708,23 @@ const QUICK_SIZE: Record<Difficulty, [number, number]> = { easy: [8, 12], medium
 /** A random board shape plus a fully generated puzzle. */
 export function quickPuzzle(opts: Omit<GenOptions, 'mode'>) {
   const rng = mulberry32(opts.seed ?? randomSeed());
-  const [lo, hi] = QUICK_SIZE[opts.difficulty];
-  const n = randInt(rng, lo / 2, hi / 2) * 2;
-  const expert = opts.difficulty === 'expert';
   const start = Date.now();
-  // Expert keeps a quarter of its budget for a fallback, so the button always returns a puzzle.
-  const deadline = start + budgetFor(opts.difficulty) * (expert ? 0.75 : 1.5);
-  for (let i = 0; i < 5 && (i === 0 || Date.now() < deadline); i++) {
-    const shape = randomShape(8, 8, n, rng);
-    const res = generate({ ...shape, regions: [] }, { ...opts, mode: 'auto', seed: (rng() * 2 ** 32) >>> 0 }, deadline);
-    if (res.ok) return { ...shape, ...res };
-  }
-  if (expert) {
-    const shape = randomShape(8, 8, n, rng);
-    const res = generate(
-      { ...shape, regions: [] },
-      { ...opts, difficulty: 'hard', mode: 'auto', seed: (rng() * 2 ** 32) >>> 0 },
-      start + budgetFor('expert'),
-    );
-    if (res.ok) return { ...shape, ...res };
+  const budget = budgetFor(opts.difficulty) * (opts.difficulty === 'expert' ? 1 : 1.5);
+  // Expert is rare on big boards: if time runs short, fall back to easier settings on
+  // smaller boards so the button always returns a puzzle (labelled with its real grade).
+  const plan: [Difficulty, number][] =
+    opts.difficulty === 'expert'
+      ? [['expert', 0.7], ['hard', 0.9], ['medium', 1]]
+      : [[opts.difficulty, 1], ['medium', 1]];
+  for (const [difficulty, share] of plan) {
+    const [lo, hi] = QUICK_SIZE[difficulty];
+    const n = randInt(rng, lo / 2, hi / 2) * 2;
+    const deadline = start + budget * share;
+    for (let i = 0; i < 5 && (i === 0 || Date.now() < deadline); i++) {
+      const shape = randomShape(8, 8, n, rng);
+      const res = generate({ ...shape, regions: [] }, { ...opts, difficulty, mode: 'auto', seed: (rng() * 2 ** 32) >>> 0 }, deadline);
+      if (res.ok) return { ...shape, ...res };
+    }
   }
   return { ok: false as const, error: 'Could not generate a puzzle, please try again.' };
 }

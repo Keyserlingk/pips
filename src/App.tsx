@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getPuzzle, loadQuick, loadTheme, saveTheme } from './model/storage';
-import { decodePuzzle } from './model/serialize';
+import type { Puzzle } from './model/types';
+import { getPuzzle, loadQuick, loadTheme, saveRemix, saveTheme } from './model/storage';
+import { decodeLegacy, decodeShare } from './model/serialize';
 import { THEMES } from './styles/themes';
 import { Home } from './ui/home/Home';
 import { Play } from './ui/play/Play';
@@ -28,20 +29,30 @@ export function App() {
   const home = () => go('#/');
   const parts = hash.replace(/^#\/?/, '').split('/');
 
-  let page: JSX.Element;
-  if (parts[0] === 'play') {
-    const puzzle =
-      parts[1] === 'quick' ? loadQuick() : parts[1] === 'local' ? getPuzzle(parts[2]) : parts[1] === 's' ? decodePuzzle(parts[2] ?? '') : null;
-    page = puzzle ? (
+  const play = (puzzle: Puzzle | null, source: 'local' | 'quick' | 'shared') =>
+    puzzle ? (
       <Play
         key={puzzle.id + hash}
         puzzle={puzzle}
+        source={source}
         onHome={home}
-        onEdit={parts[1] === 'local' ? () => go(`#/edit/${puzzle.id}`) : undefined}
+        onEdit={source === 'local' ? () => go(`#/edit/${puzzle.id}`) : undefined}
+        onRemix={() => {
+          saveRemix(puzzle);
+          go('#/edit/remix');
+        }}
       />
     ) : (
       <NotFound onHome={home} />
     );
+
+  let page: JSX.Element;
+  if (parts[0] === 'p') {
+    page = <SharedPlay key={parts[1]} code={parts[1] ?? ''} render={(p) => play(p, 'shared')} />;
+  } else if (parts[0] === 'play') {
+    if (parts[1] === 'quick') page = play(loadQuick(), 'quick');
+    else if (parts[1] === 'local') page = play(getPuzzle(parts[2]), 'local');
+    else page = play(parts[1] === 's' ? decodeLegacy(parts[2] ?? '') : null, 'shared');
   } else if (parts[0] === 'edit') {
     page = <Editor key={parts[1]} id={parts[1] || 'new'} onHome={home} onPlay={(id) => go(`#/play/local/${id}`)} />;
   } else {
@@ -75,6 +86,20 @@ export function App() {
       <main>{page}</main>
     </div>
   );
+}
+
+/** Share links are decoded asynchronously (they are compressed). */
+function SharedPlay({ code, render }: { code: string; render: (p: Puzzle | null) => JSX.Element }) {
+  const [puzzle, setPuzzle] = useState<Puzzle | null | undefined>(undefined);
+  useEffect(() => {
+    let live = true;
+    decodeShare(code).then((p) => live && setPuzzle(p));
+    return () => {
+      live = false;
+    };
+  }, [code]);
+  if (puzzle === undefined) return <p className="muted">Loading puzzle…</p>;
+  return render(puzzle);
 }
 
 function NotFound({ onHome }: { onHome: () => void }) {

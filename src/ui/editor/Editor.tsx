@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { Cell, Constraint, Difficulty, ExtraKind, Puzzle, Region } from '../../model/types';
 import { DEFAULT_OPTIONS, EXTRA_KINDS, NUM_REGION_COLORS } from '../../model/types';
 import { DIRS, add, constraintLabel, key, newId, sameCell, setSize, toIdx } from '../../model/cells';
-import { getPuzzle, savePuzzle, saveProgress } from '../../model/storage';
+import { getPuzzle, loadRemix, savePuzzle, saveProgress } from '../../model/storage';
 import { shareUrl } from '../../model/serialize';
 import { runEngine } from '../../engine/client';
 import type { GenMode, GenStats } from '../../engine/generator';
@@ -74,7 +74,13 @@ const withNumber = (c: Constraint, v: number): Constraint =>
   c.kind === 'step' ? { ...c, max: v } : c.kind === 'sum' || c.kind === 'product' || c.kind === 'extreme' ? { ...c, value: v } : c;
 
 export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void; onPlay: (id: string) => void }) {
-  const [draft, setDraft] = useState<Puzzle>(() => (id !== 'new' && getPuzzle(id)) || blankPuzzle());
+  const [draft, setDraft] = useState<Puzzle>(() => {
+    if (id === 'remix') {
+      const src = loadRemix();
+      if (src) return { ...src, id: newId(), title: `${src.title} (remix)` };
+    }
+    return (id !== 'new' && getPuzzle(id)) || blankPuzzle();
+  });
   const [tool, setTool] = useState<Tool>('cells');
   const [sel, setSel] = useState<string | null>(null);
   const [mode, setMode] = useState<GenMode>('auto');
@@ -83,7 +89,7 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
   const [stats, setStats] = useState<GenStats | null>(null);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
   const [showSolution, setShowSolution] = useState(false);
-  const [saved, setSaved] = useState(id !== 'new');
+  const [saved, setSaved] = useState(id !== 'new' && id !== 'remix');
   const [shapeSize, setShapeSize] = useState(16);
   const svgRef = useRef<SVGSVGElement>(null);
   const paint = useRef<{ mode: 'add' | 'remove'; last: string; regionId?: string } | null>(null);
@@ -259,7 +265,7 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
     savePuzzle(draft);
     saveProgress(draft.id, null);
     setSaved(true);
-    if (id === 'new') history.replaceState(null, '', `#/edit/${draft.id}`);
+    if (id === 'new' || id === 'remix') history.replaceState(null, '', `#/edit/${draft.id}`);
     return true;
   };
 
@@ -275,7 +281,7 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
   const copyLink = async () => {
     if (!playable) return setMessage({ kind: 'error', text: 'Generate dominoes first.' });
     try {
-      await navigator.clipboard.writeText(shareUrl(draft));
+      await navigator.clipboard.writeText(await shareUrl(draft));
       setMessage({ kind: 'info', text: 'Share link copied.' });
     } catch {
       setMessage({ kind: 'error', text: 'Could not copy to the clipboard.' });

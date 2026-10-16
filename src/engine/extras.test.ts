@@ -123,13 +123,13 @@ describe('generator with extras', () => {
   const rect = (w: number, h: number) => Array.from({ length: w * h }, (_, i) => ({ r: Math.floor(i / w), c: i % w }));
   it('produces unique, solvable puzzles that use the extra kinds', () => {
     const kinds = new Set<string>();
-    for (let seed = 1; seed <= 12; seed++) {
-      const cells = rect(5, 4);
+    for (let seed = 1; seed <= 24; seed++) {
+      const cells = rect(4, 4);
       const res = generate(
-        { width: 5, height: 4, cells, regions: [] },
+        { width: 4, height: 4, cells, regions: [] },
         {
           mode: 'auto',
-          difficulty: 'medium',
+          difficulty: 'easy',
           maxPip: 6,
           allowDuplicates: false,
           requireUnique: true,
@@ -141,7 +141,7 @@ describe('generator with extras', () => {
       if (!res.ok) continue;
       expect(res.stats.solutions).toBe(1);
       res.regions.forEach((r) => kinds.add(r.constraint.kind));
-      const check = verify({ width: 5, height: 4, cells, regions: res.regions }, res.dominoes, 6);
+      const check = verify({ width: 4, height: 4, cells, regions: res.regions }, res.dominoes, 6);
       expect(check.ok && check.stats.solutions).toBe(1);
     }
     for (const k of ['step', 'product', 'extreme', 'sumParity']) expect(kinds.has(k), k).toBe(true);
