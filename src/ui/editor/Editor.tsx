@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import type { Cell, Constraint, Difficulty, Puzzle, Region } from '../../model/types';
-import { DEFAULT_OPTIONS, NUM_REGION_COLORS } from '../../model/types';
+import type { Cell, Constraint, Difficulty, ExtraKind, Puzzle, Region } from '../../model/types';
+import { DEFAULT_OPTIONS, EXTRA_KINDS, NUM_REGION_COLORS } from '../../model/types';
 import { DIRS, add, constraintLabel, key, newId, sameCell, setSize, toIdx } from '../../model/cells';
 import { getPuzzle, savePuzzle, saveProgress } from '../../model/storage';
 import { shareUrl } from '../../model/serialize';
@@ -39,17 +39,39 @@ const MODES: { id: GenMode; label: string; help: string }[] = [
   { id: 'manual', label: 'My regions & constraints', help: 'Keeps everything you made and searches for dominoes that fit.' },
 ];
 
-const KINDS: { label: string; title: string; make: (v: number) => Constraint }[] = [
-  { label: '–', title: 'No constraint', make: () => ({ kind: 'none' }) },
-  { label: 'Σ', title: 'Sum equals', make: (v) => ({ kind: 'sum', op: '=', value: v }) },
-  { label: '<', title: 'Sum less than', make: (v) => ({ kind: 'sum', op: '<', value: v }) },
-  { label: '>', title: 'Sum greater than', make: (v) => ({ kind: 'sum', op: '>', value: v }) },
-  { label: '=', title: 'All equal', make: () => ({ kind: 'equal' }) },
-  { label: '≠', title: 'All different', make: () => ({ kind: 'distinct' }) },
+const KINDS: { label: string; title: string; extra?: ExtraKind; is: (c: Constraint) => boolean; make: (v: number) => Constraint }[] = [
+  { label: '–', title: 'No constraint', is: (c) => c.kind === 'none', make: () => ({ kind: 'none' }) },
+  { label: 'Σ', title: 'Sum equals', is: (c) => c.kind === 'sum' && c.op === '=', make: (v) => ({ kind: 'sum', op: '=', value: v }) },
+  { label: '<', title: 'Sum less than', is: (c) => c.kind === 'sum' && c.op === '<', make: (v) => ({ kind: 'sum', op: '<', value: v }) },
+  { label: '>', title: 'Sum greater than', is: (c) => c.kind === 'sum' && c.op === '>', make: (v) => ({ kind: 'sum', op: '>', value: v }) },
+  { label: '=', title: 'All equal', is: (c) => c.kind === 'equal', make: () => ({ kind: 'equal' }) },
+  { label: '≠', title: 'All different', is: (c) => c.kind === 'distinct', make: () => ({ kind: 'distinct' }) },
+  { label: 'Δ', title: 'Max step between neighbours', extra: 'step', is: (c) => c.kind === 'step', make: (v) => ({ kind: 'step', max: Math.min(v, 2) }) },
+  { label: '×', title: 'Product equals', extra: 'product', is: (c) => c.kind === 'product', make: (v) => ({ kind: 'product', value: v }) },
+  {
+    label: 'max',
+    title: 'Largest value equals',
+    extra: 'extreme',
+    is: (c) => c.kind === 'extreme' && c.which === 'max',
+    make: (v) => ({ kind: 'extreme', which: 'max', value: Math.min(v, 6) }),
+  },
+  {
+    label: 'min',
+    title: 'Smallest value equals',
+    extra: 'extreme',
+    is: (c) => c.kind === 'extreme' && c.which === 'min',
+    make: (v) => ({ kind: 'extreme', which: 'min', value: Math.min(v, 6) }),
+  },
+  { label: 'Σ even', title: 'Sum is even', extra: 'sumParity', is: (c) => c.kind === 'sumParity' && c.even, make: () => ({ kind: 'sumParity', even: true }) },
+  { label: 'Σ odd', title: 'Sum is odd', extra: 'sumParity', is: (c) => c.kind === 'sumParity' && !c.even, make: () => ({ kind: 'sumParity', even: false }) },
 ];
 
-const kindIndex = (c: Constraint) =>
-  c.kind === 'none' ? 0 : c.kind === 'equal' ? 4 : c.kind === 'distinct' ? 5 : c.op === '=' ? 1 : c.op === '<' ? 2 : 3;
+/** The number a constraint carries (sum/product/extreme value, or the max step), if any. */
+const numberOf = (c: Constraint): number | null =>
+  c.kind === 'sum' || c.kind === 'product' || c.kind === 'extreme' ? c.value : c.kind === 'step' ? c.max : null;
+
+const withNumber = (c: Constraint, v: number): Constraint =>
+  c.kind === 'step' ? { ...c, max: v } : c.kind === 'sum' || c.kind === 'product' || c.kind === 'extreme' ? { ...c, value: v } : c;
 
 export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void; onPlay: (id: string) => void }) {
   const [draft, setDraft] = useState<Puzzle>(() => (id !== 'new' && getPuzzle(id)) || blankPuzzle());
@@ -68,6 +90,7 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
 
   const active = useMemo(() => new Set(draft.cells.map(key)), [draft.cells]);
   const selected = draft.regions.find((r) => r.id === sel) ?? null;
+  const extras = draft.options.extras ?? [];
   const layout = { width: draft.width, height: draft.height, cells: draft.cells, regions: draft.regions };
   const layoutError = validateLayout(layout, draft.options);
   const badCells = useMemo(() => {
@@ -375,31 +398,26 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
             {selected && (
               <div className="region-editor">
                 <div className="seg">
-                  {KINDS.map((k, i) => (
+                  {KINDS.filter((k) => !k.extra || extras.includes(k.extra) || k.is(selected.constraint)).map((k) => (
                     <button
                       key={k.title}
                       title={k.title}
-                      className={kindIndex(selected.constraint) === i ? 'on' : ''}
-                      onClick={() =>
-                        setConstraint(selected, k.make(selected.constraint.kind === 'sum' ? selected.constraint.value : 6))
-                      }
+                      className={k.is(selected.constraint) ? 'on' : ''}
+                      onClick={() => setConstraint(selected, k.make(numberOf(selected.constraint) ?? 6))}
                     >
                       {k.label}
                     </button>
                   ))}
                 </div>
-                {selected.constraint.kind === 'sum' && (
+                {numberOf(selected.constraint) !== null && (
                   <label>
-                    Value
+                    {selected.constraint.kind === 'step' ? 'Max difference' : 'Value'}
                     <input
                       type="number"
                       min={0}
-                      max={99}
-                      value={selected.constraint.value}
-                      onChange={(e) =>
-                        selected.constraint.kind === 'sum' &&
-                        setConstraint(selected, { ...selected.constraint, value: Math.max(0, +e.target.value || 0) })
-                      }
+                      max={999}
+                      value={numberOf(selected.constraint)!}
+                      onChange={(e) => setConstraint(selected, withNumber(selected.constraint, Math.max(0, +e.target.value || 0)))}
                     />
                   </label>
                 )}
@@ -478,6 +496,24 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
               />
               Require a unique solution
             </label>
+            <details className="extras" open={extras.length > 0}>
+              <summary>Extra constraints</summary>
+              <p className="muted small">New rule types for the generator and the region editor. Off by default.</p>
+              {EXTRA_KINDS.map((k) => (
+                <label key={k.id} className="check">
+                  <input
+                    type="checkbox"
+                    checked={extras.includes(k.id)}
+                    onChange={(e) => {
+                      const next = e.target.checked ? [...extras, k.id] : extras.filter((x) => x !== k.id);
+                      setDraft((d) => ({ ...d, options: { ...d.options, extras: next } }));
+                      setSaved(false);
+                    }}
+                  />
+                  {k.name}
+                </label>
+              ))}
+            </details>
             <div className="row">
               {busy ? (
                 <>

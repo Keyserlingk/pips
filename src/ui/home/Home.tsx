@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
-import { DEFAULT_OPTIONS } from '../../model/types';
+import { DEFAULT_OPTIONS, EXTRA_KINDS } from '../../model/types';
 import { deletePuzzle, loadLibrary, saveProgress, savePuzzle, saveQuick } from '../../model/storage';
 import { isPuzzle, shareUrl } from '../../model/serialize';
 import { newId } from '../../model/cells';
@@ -11,12 +11,14 @@ export function Home({ go }: { go: (hash: string) => void }) {
   const [library, setLibrary] = useState<Puzzle[]>(loadLibrary);
   const [busy, setBusy] = useState<Difficulty | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [withExtras, setWithExtras] = useState(false);
+  const options = { ...DEFAULT_OPTIONS, extras: withExtras ? EXTRA_KINDS.map((k) => k.id) : [] };
   const fileRef = useRef<HTMLInputElement>(null);
 
   const quick = (difficulty: Difficulty) => {
     setBusy(difficulty);
     setError(null);
-    runEngine('quick', { ...DEFAULT_OPTIONS, difficulty, seed: randomSeed() })
+    runEngine('quick', { ...options, difficulty, seed: randomSeed() })
       .promise.then((res) => {
         if (!res.ok) return setError(res.error);
         const p: Puzzle = {
@@ -30,7 +32,7 @@ export function Home({ go }: { go: (hash: string) => void }) {
           regions: res.regions,
           dominoes: res.dominoes,
           solution: res.solution,
-          options: { ...DEFAULT_OPTIONS },
+          options,
         };
         saveQuick(p);
         saveProgress(p.id, null);
@@ -65,6 +67,10 @@ export function Home({ go }: { go: (hash: string) => void }) {
             </button>
           ))}
         </div>
+        <label className="check extras-toggle">
+          <input type="checkbox" checked={withExtras} onChange={(e) => setWithExtras(e.target.checked)} />
+          Include extra constraints (max step, product, max/min, sum parity)
+        </label>
         {error && <p className="error small">{error}</p>}
       </section>
 

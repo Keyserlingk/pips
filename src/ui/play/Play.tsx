@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Cell, Puzzle } from '../../model/types';
-import { DIRS, add, evaluate, key, sameCell } from '../../model/cells';
+import { DIRS, add, constraintRule, evaluate, key, ruleKey, sameCell } from '../../model/cells';
 import { type Orient, type PlayState, loadProgress, saveProgress } from '../../model/storage';
 import { shareUrl } from '../../model/serialize';
 import { Board, type BoardDomino, cellAt, cellPixels } from '../board/Board';
@@ -59,6 +59,12 @@ export function Play({ puzzle, onHome, onEdit }: { puzzle: Puzzle; onHome: () =>
     }
     return { values, occupant };
   }, [st.placed, puzzle]);
+
+  const rules = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const reg of puzzle.regions) if (reg.constraint.kind !== 'none') seen.set(ruleKey(reg.constraint), constraintRule(reg.constraint));
+    return [...seen.values()];
+  }, [puzzle]);
 
   const evaluation = useMemo(() => evaluate(puzzle, values), [puzzle, values]);
 
@@ -253,6 +259,16 @@ export function Play({ puzzle, onHome, onEdit }: { puzzle: Puzzle; onHome: () =>
           })}
         </div>
         <p className="hint">Drag dominoes onto the board. Tap a domino to rotate it.</p>
+        {rules.length > 0 && (
+          <details className="legend">
+            <summary>Rules</summary>
+            <ul>
+              {rules.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
 
       {drag && <DragGhost {...drag} dominoes={puzzle.dominoes} />}

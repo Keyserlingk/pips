@@ -156,20 +156,38 @@ export function Board(props: Props) {
         const label = constraintLabel(reg.constraint);
         if (!label || !reg.cells.length) return null;
         const anchor = reg.cells.reduce((m, c) => (c.r > m.r || (c.r === m.r && c.c > m.c) ? c : m));
-        const cx = (anchor.c + 1) * S - 22;
-        const cy = (anchor.r + 1) * S - 8;
         const st = status[reg.id];
+        const fill = st === 'bad' ? 'var(--bad)' : `var(--region-${reg.color}-stroke)`;
+        const stroke = st === 'ok' ? 'var(--ok)' : 'var(--surface)';
+        const strokeWidth = st === 'ok' ? 7 : 4;
+        // Short labels sit in a diamond; longer ones (extra constraints) in a pill.
+        const pill = label.length > 3;
+        const pw = 24 + label.length * 15;
+        const cx = pill ? (anchor.c + 1) * S - pw / 2 + 8 : (anchor.c + 1) * S - 22;
+        const cy = (anchor.r + 1) * S - 8;
         const h = label.length > 2 ? 36 : 30;
         return (
           <g key={`b${reg.id}`} className="badge" pointerEvents="none">
-            <polygon
-              points={`${cx},${cy - h} ${cx + h},${cy} ${cx},${cy + h} ${cx - h},${cy}`}
-              strokeLinejoin="round"
-              fill={st === 'bad' ? 'var(--bad)' : `var(--region-${reg.color}-stroke)`}
-              stroke={st === 'ok' ? 'var(--ok)' : 'var(--surface)'}
-              strokeWidth={st === 'ok' ? 7 : 4}
-            />
-            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central" fontSize={label.length > 2 ? 22 : label.length > 1 ? 26 : 32} fontWeight={800} fill="#fff">
+            {pill ? (
+              <rect x={cx - pw / 2} y={cy - 22} width={pw} height={44} rx={22} fill={fill} stroke={stroke} strokeWidth={strokeWidth} />
+            ) : (
+              <polygon
+                points={`${cx},${cy - h} ${cx + h},${cy} ${cx},${cy + h} ${cx - h},${cy}`}
+                strokeLinejoin="round"
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+              />
+            )}
+            <text
+              x={cx}
+              y={cy}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={pill ? 24 : label.length > 2 ? 22 : label.length > 1 ? 26 : 32}
+              fontWeight={800}
+              fill="#fff"
+            >
               {label}
             </text>
           </g>

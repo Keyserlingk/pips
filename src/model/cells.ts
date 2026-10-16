@@ -32,10 +32,55 @@ export function constraintLabel(con: Constraint): string {
       return '≠';
     case 'none':
       return '';
+    case 'step':
+      return `Δ≤${con.max}`;
+    case 'product':
+      return `×${con.value}`;
+    case 'extreme':
+      return `${con.which} ${con.value}`;
+    case 'sumParity':
+      return con.even ? 'Σ even' : 'Σ odd';
   }
 }
 
-export function satisfies(con: Constraint, values: number[]): boolean {
+/** Plain-language rule, used by the legend on the play screen. */
+export function constraintRule(con: Constraint): string {
+  switch (con.kind) {
+    case 'sum':
+      return con.op === '='
+        ? 'A number: the pips in the region add up to it.'
+        : con.op === '<'
+          ? '<N: the pips in the region add up to less than N.'
+          : '>N: the pips in the region add up to more than N.';
+    case 'equal':
+      return '=: every cell in the region shows the same number.';
+    case 'distinct':
+      return '≠: every cell in the region shows a different number.';
+    case 'none':
+      return '';
+    case 'step':
+      return 'Δ≤N: side-by-side cells in the region differ by at most N.';
+    case 'product':
+      return '×N: the pips in the region multiply to N.';
+    case 'extreme':
+      return con.which === 'max'
+        ? 'max N: the largest number in the region is exactly N.'
+        : 'min N: the smallest number in the region is exactly N.';
+    case 'sumParity':
+      return 'Σ even / Σ odd: the pips in the region add up to an even / odd number.';
+  }
+}
+
+/** Key used to show each kind of rule once in the legend. */
+export function ruleKey(con: Constraint): string {
+  if (con.kind === 'sum') return `sum${con.op}`;
+  if (con.kind === 'extreme') return `extreme${con.which}`;
+  return con.kind;
+}
+
+/** `cells[i]` holds `values[i]`; cells are only needed for adjacency rules. */
+export function satisfies(con: Constraint, values: number[], cells: Cell[] = []): boolean {
+  const sum = () => values.reduce((a, b) => a + b, 0);
   switch (con.kind) {
     case 'none':
       return true;
@@ -44,9 +89,19 @@ export function satisfies(con: Constraint, values: number[]): boolean {
     case 'distinct':
       return new Set(values).size === values.length;
     case 'sum': {
-      const s = values.reduce((a, b) => a + b, 0);
+      const s = sum();
       return con.op === '=' ? s === con.value : con.op === '<' ? s < con.value : s > con.value;
     }
+    case 'step':
+      return cells.every((a, i) =>
+        cells.every((b, j) => Math.abs(a.r - b.r) + Math.abs(a.c - b.c) !== 1 || Math.abs(values[i] - values[j]) <= con.max),
+      );
+    case 'product':
+      return values.reduce((a, b) => a * b, 1) === con.value;
+    case 'extreme':
+      return (con.which === 'max' ? Math.max(...values) : Math.min(...values)) === con.value;
+    case 'sumParity':
+      return (sum() % 2 === 0) === con.even;
   }
 }
 
@@ -61,7 +116,7 @@ export function evaluate(p: Puzzle, values: Map<string, number>) {
       status[reg.id] = 'open';
       continue;
     }
-    const ok = satisfies(reg.constraint, vals as number[]);
+    const ok = satisfies(reg.constraint, vals as number[], reg.cells);
     status[reg.id] = ok ? 'ok' : 'bad';
     if (!ok) solved = false;
   }

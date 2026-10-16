@@ -23,6 +23,11 @@ export interface SolveOptions {
   nodeLimit?: number;
   /** Randomise branch order (used when searching for a domino set). */
   rng?: Rng;
+  /**
+   * Count solutions that differ only in how dominoes are paired, but show the
+   * same number on every cell, as one. The player only sees the numbers.
+   */
+  distinctValues?: boolean;
 }
 
 export interface Solution {
@@ -100,6 +105,7 @@ export function solve(p: SolveProblem, opts: SolveOptions = {}): SolveResult {
     const k = rSize[r] - rFilled[r];
     switch (con.kind) {
       case 'none':
+      case 'step': // checked per placed cell by stepOk
         return true;
       case 'sum': {
         const lo = rSum[r] + smallest(k);
@@ -124,7 +130,66 @@ export function solve(p: SolveProblem, opts: SolveOptions = {}): SolveResult {
         for (let v = 0; v < P; v++) if (rVals[r * P + v] === 0 && pipCount[v] > 0) avail++;
         return avail >= k;
       }
+      case 'product': {
+        if (rVals[r * P] > 0) return con.value === 0;
+        if (con.value === 0) return k > 0 && pipCount[0] > 0;
+        let prod = 1;
+        for (let v = 2; v < P; v++) if (rVals[r * P + v]) prod *= v ** rVals[r * P + v];
+        if (con.value % prod !== 0) return false;
+        const q = con.value / prod;
+        if (k === 0) return q === 1;
+        // Remaining cells must be non-zero and multiply to q.
+        let lo = 0;
+        let hi = 0;
+        for (let v = 1; v < P; v++)
+          if (pipCount[v] > 0) {
+            if (!lo) lo = v;
+            hi = v;
+          }
+        return lo > 0 && lo ** k <= q && q <= hi ** k;
+      }
+      case 'extreme': {
+        const target = con.value;
+        const isMax = con.which === 'max';
+        if (target < 0 || target >= P) return false;
+        // No placed value may lie beyond the target.
+        for (let v = isMax ? target + 1 : 0; isMax ? v < P : v < target; v++) if (rVals[r * P + v] > 0) return false;
+        if (k === 0) return rVals[r * P + target] > 0;
+        let fits = false;
+        for (let v = isMax ? 0 : target; isMax ? v <= target : v < P; v++) if (pipCount[v] > 0) fits = true;
+        if (!fits) return false;
+        return rVals[r * P + target] > 0 || pipCount[target] > 0;
+      }
+      case 'sumParity': {
+        const want = con.even ? 0 : 1;
+        if (k === 0) return rSum[r] % 2 === want;
+        let hasEven = false;
+        let hasOdd = false;
+        for (let v = 0; v < P; v++)
+          if (pipCount[v] > 0) {
+            if (v % 2) hasOdd = true;
+            else hasEven = true;
+          }
+        if (hasEven && hasOdd) return true;
+        if (hasEven) return rSum[r] % 2 === want;
+        if (hasOdd) return (rSum[r] + k) % 2 === want;
+        return false;
+      }
     }
+  };
+
+  // Same-region neighbours of each cell whose region has a step rule.
+  const stepNbrs: number[][] = Array.from({ length: N }, () => []);
+  const stepMax = new Int32Array(N);
+  for (const c of p.cells) {
+    const con = p.regionOf[c] >= 0 ? p.constraints[p.regionOf[c]] : null;
+    if (con?.kind !== 'step') continue;
+    stepMax[c] = con.max;
+    stepNbrs[c] = nbrs[c].filter((n) => p.regionOf[n] === p.regionOf[c]);
+  }
+  const stepOk = (c: number) => {
+    for (const n of stepNbrs[c]) if (value[n] !== -1 && Math.abs(value[c] - value[n]) > stepMax[c]) return false;
+    return true;
   };
 
   const setCell = (c: number, v: number, sign: 1 | -1) => {
@@ -145,6 +210,7 @@ export function solve(p: SolveProblem, opts: SolveOptions = {}): SolveResult {
   };
 
   const solutions: Solution[] = [];
+  const seenValues = new Set<string>();
   let nodes = 0;
   let aborted = false;
   let remaining = p.cells.length;
@@ -152,6 +218,11 @@ export function solve(p: SolveProblem, opts: SolveOptions = {}): SolveResult {
 
   const search = (): void => {
     if (remaining === 0) {
+      if (opts.distinctValues) {
+        const k = value.join(',');
+        if (seenValues.has(k)) return;
+        seenValues.add(k);
+      }
       solutions.push({ values: Array.from(value), partner: Array.from(partner) });
       return;
     }
@@ -190,7 +261,7 @@ export function solve(p: SolveProblem, opts: SolveOptions = {}): SolveResult {
           partner[best] = n;
           partner[n] = best;
           remaining -= 2;
-          if (allOk()) search();
+          if (stepOk(best) && stepOk(n) && allOk()) search();
           remaining += 2;
           partner[best] = -1;
           partner[n] = -1;

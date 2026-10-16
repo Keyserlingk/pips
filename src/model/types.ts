@@ -6,7 +6,25 @@ export type Constraint =
   | { kind: 'sum'; op: SumOp; value: number }
   | { kind: 'equal' }
   | { kind: 'distinct' }
-  | { kind: 'none' };
+  | { kind: 'none' }
+  // Extra constraints (opt-in via PuzzleOptions.extras)
+  /** Orthogonally adjacent cells in the region differ by at most `max`. */
+  | { kind: 'step'; max: number }
+  /** The values multiply to `value`. */
+  | { kind: 'product'; value: number }
+  /** The largest (or smallest) value in the region is exactly `value`. */
+  | { kind: 'extreme'; which: 'max' | 'min'; value: number }
+  /** The region's sum is even (or odd). */
+  | { kind: 'sumParity'; even: boolean };
+
+export type ExtraKind = 'step' | 'product' | 'extreme' | 'sumParity';
+
+export const EXTRA_KINDS: { id: ExtraKind; name: string }[] = [
+  { id: 'step', name: 'Max step' },
+  { id: 'product', name: 'Product' },
+  { id: 'extreme', name: 'Max / min' },
+  { id: 'sumParity', name: 'Sum even / odd' },
+];
 
 export type Region = {
   id: string;
@@ -28,6 +46,8 @@ export type PuzzleOptions = {
   maxPip: 6 | 9;
   allowDuplicates: boolean;
   requireUnique: boolean;
+  /** Extra constraint kinds the editor offers and the generator may use. Missing = none. */
+  extras?: ExtraKind[];
 };
 
 export type Puzzle = {
@@ -48,4 +68,4 @@ export type Puzzle = {
 
 export const NUM_REGION_COLORS = 8;
 
-export const DEFAULT_OPTIONS: PuzzleOptions = { maxPip: 6, allowDuplicates: false, requireUnique: true };
+export const DEFAULT_OPTIONS: PuzzleOptions = { maxPip: 6, allowDuplicates: false, requireUnique: true, extras: [] };
