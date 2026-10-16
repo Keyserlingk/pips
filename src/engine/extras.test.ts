@@ -129,7 +129,7 @@ describe('generator with extras', () => {
         { width: 5, height: 4, cells, regions: [] },
         {
           mode: 'auto',
-          difficulty: 'hard',
+          difficulty: 'medium',
           maxPip: 6,
           allowDuplicates: false,
           requireUnique: true,

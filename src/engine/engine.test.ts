@@ -117,9 +117,9 @@ describe('generator', () => {
   });
 
   it('quick puzzles work for all difficulties', () => {
-    for (const difficulty of ['easy', 'medium', 'hard'] as const) {
+    for (const difficulty of ['easy', 'medium', 'hard', 'expert'] as const) {
       const q = quickPuzzle({ difficulty, maxPip: 6, allowDuplicates: false, requireUnique: true, seed: 11 });
       expect(q.ok).toBe(true);
     }
-  });
+  }, 30_000);
 });

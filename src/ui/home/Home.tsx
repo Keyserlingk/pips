@@ -60,10 +60,10 @@ export function Home({ go }: { go: (hash: string) => void }) {
         <h1>Custom Pips</h1>
         <p className="muted">Place every domino so that each coloured region meets its condition.</p>
         <div className="quick">
-          {(['easy', 'medium', 'hard'] as Difficulty[]).map((d) => (
+          {(['easy', 'medium', 'hard', 'expert'] as Difficulty[]).map((d) => (
             <button key={d} className={`quick-card ${d}`} onClick={() => quick(d)} disabled={!!busy}>
               <span className="quick-label">{d}</span>
-              <span className="muted small">{busy === d ? 'Generating…' : 'Random puzzle'}</span>
+              <span className="muted small">{busy === d ? (d === 'expert' ? 'Generating… (up to 10 s)' : 'Generating…') : 'Random puzzle'}</span>
             </button>
           ))}
         </div>

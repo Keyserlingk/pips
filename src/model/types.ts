@@ -40,7 +40,7 @@ export type Domino = [number, number];
 /** A domino in the solution: pips[0] lies on `a`, pips[1] on `b`. */
 export type Placement = { a: Cell; b: Cell; pips: Domino };
 
-export type Difficulty = 'easy' | 'medium' | 'hard';
+export type Difficulty = 'easy' | 'medium' | 'hard' | 'expert';
 
 export type PuzzleOptions = {
   maxPip: 6 | 9;

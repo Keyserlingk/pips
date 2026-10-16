@@ -241,7 +241,11 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
     run('Checking…', job, (res) => {
       if (!res.ok) return;
       setStats(res.stats);
-      setDraft((d) => ({ ...d, solution: res.solution.length ? res.solution : undefined }));
+      setDraft((d) => ({
+        ...d,
+        solution: res.solution.length ? res.solution : undefined,
+        difficulty: res.stats.solutions === 1 ? res.stats.rating : d.difficulty,
+      }));
     });
   };
 
@@ -467,6 +471,7 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
                   <option value="easy">Easy</option>
                   <option value="medium">Medium</option>
                   <option value="hard">Hard</option>
+                  <option value="expert">Expert (up to 10 s)</option>
                 </select>
               </label>
               <label>
