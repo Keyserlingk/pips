@@ -831,5 +831,12 @@ export function quickPuzzle(opts: Omit<GenOptions, 'mode'>) {
       if (res.ok) return { ...shape, ...res };
     }
   }
+  // Last resort (a slow device, or a busy one): a small easy board without a time limit,
+  // which takes milliseconds, so the button never comes back empty.
+  for (let i = 0; i < 5; i++) {
+    const shape = randomShape(8, 8, 10, rng);
+    const res = generate({ ...shape, regions: [] }, { ...opts, difficulty: 'easy', mode: 'auto', seed: (rng() * 2 ** 32) >>> 0 }, Infinity);
+    if (res.ok) return { ...shape, ...res };
+  }
   return { ok: false as const, error: 'Could not generate a puzzle, please try again.' };
 }
