@@ -5,7 +5,7 @@ import { decodeShare, encodeShare, samePuzzle } from './serialize';
 
 describe('share links', () => {
   it('round-trips a puzzle without its solution, and is short', async () => {
-    const q = quickPuzzle({ difficulty: 'hard', maxPip: 6, allowDuplicates: false, requireUnique: true, extras: EXTRA_KINDS.map((k) => k.id), seed: 5 });
+    const q = quickPuzzle({ difficulty: 'medium', maxPip: 6, allowDuplicates: false, requireUnique: true, extras: EXTRA_KINDS.map((k) => k.id), seed: 5 });
     if (!q.ok) throw new Error(q.error);
     const p = {
       version: 1 as const,
@@ -30,7 +30,7 @@ describe('share links', () => {
     const legacyLength = Math.ceil((new TextEncoder().encode(JSON.stringify(p)).length * 4) / 3);
     console.log(`SHARE ${p.cells.length} cells: new ${code.length} chars, old ${legacyLength} chars`);
     expect(code.length).toBeLessThan(legacyLength / 3);
-  });
+  }, 30_000);
 
   it('rejects garbage', async () => {
     expect(await decodeShare('zNOTVALID')).toBeNull();

@@ -478,6 +478,7 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
                   <option value="medium">Medium</option>
                   <option value="hard">Hard</option>
                   <option value="expert">Expert (up to 10 s)</option>
+                  <option value="rachel">Rachel: much harder, best with double-nine (up to 15 s)</option>
                 </select>
               </label>
               <label>
@@ -555,7 +556,10 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
                 {stats.solutions > 0 && stats.aborted && <span className="muted"> (search limit reached)</span>}
                 <span className="muted">
                   {' '}
-                  · rated <strong>{stats.rating}</strong> · {stats.nodes.toLocaleString()} search steps
+                  · rated <strong>{stats.rating}</strong>
+                  {stats.entryPoints !== undefined &&
+                    ` · ${stats.entryPoints} starting point${stats.entryPoints === 1 ? '' : 's'}`}
+                  {' '}· {stats.nodes.toLocaleString()} search steps
                 </span>
               </p>
             )}

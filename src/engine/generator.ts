@@ -33,6 +33,8 @@ export interface GenStats {
   aborted: boolean;
   nodes: number;
   rating: Difficulty;
+  /** Forced moves available at the start (unique puzzles only). */
+  entryPoints?: number;
 }
 
 export type GenResult =
@@ -48,10 +50,12 @@ const ALT_BATCH = 2;
 const UNIQUIFY_BUDGET = 1_500_000;
 /** Wall-clock budget for one generate() call. */
 const TIME_BUDGET_MS = 3000;
-/** Expert puzzles are rare, so the generator gets longer to find one. */
-const EXPERT_TIME_BUDGET_MS = 10_000;
-const budgetFor = (d: Difficulty) => (d === 'expert' ? EXPERT_TIME_BUDGET_MS : TIME_BUDGET_MS);
-export const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'expert'];
+/** Expert and Rachel puzzles are rare, so the generator gets longer to find one. */
+const BUDGET_MS: Partial<Record<Difficulty, number>> = { expert: 10_000, rachel: 15_000 };
+const budgetFor = (d: Difficulty) => BUDGET_MS[d] ?? TIME_BUDGET_MS;
+export const DIFFICULTIES: Difficulty[] = ['easy', 'medium', 'hard', 'expert', 'rachel'];
+/** Levels that search longer and alternate careful and fast uniqueness repairs. */
+const isTop = (d: Difficulty) => d === 'expert' || d === 'rachel';
 
 type EReg = { id: string; color: number; cells: number[]; constraint: Constraint };
 
@@ -111,13 +115,19 @@ function statsFrom(
   dominoes: Domino[],
 ): GenStats {
   const solutions = Math.min(2, res.solutions.length) as 0 | 1 | 2;
-  let rating = rate(res.nodes, cells.length);
+  const stats: GenStats = { solutions, aborted: res.aborted, nodes: res.nodes, rating: rate(res.nodes, cells.length) };
   if (solutions === 1 && !res.aborted) {
-    const regionOf = new Array(W * H).fill(-1);
-    regs.forEach((r, i) => r.cells.forEach((c) => (regionOf[c] = i)));
-    rating = gradeLogic({ width: W, height: H, cells, regionOf, constraints: regs.map((r) => r.constraint), dominoes }).grade;
+    const logic = gradeRegions(W, H, cells, regs, dominoes);
+    stats.rating = logic.grade;
+    stats.entryPoints = logic.entryPoints;
   }
-  return { solutions, aborted: res.aborted, nodes: res.nodes, rating };
+  return stats;
+}
+
+function gradeRegions(W: number, H: number, cells: number[], regs: { cells: number[]; constraint: Constraint }[], dominoes: Domino[]) {
+  const regionOf = new Array(W * H).fill(-1);
+  regs.forEach((r, i) => r.cells.forEach((c) => (regionOf[c] = i)));
+  return gradeLogic({ width: W, height: H, cells, regionOf, constraints: regs.map((r) => r.constraint), dominoes });
 }
 
 // ---------------------------------------------------------------- validation
@@ -141,15 +151,17 @@ const REGION_SIZES: Record<Difficulty, [number, number][]> = {
   medium: [[1, 2], [2, 4], [3, 3], [4, 2]],
   hard: [[1, 1], [2, 3], [3, 3], [4, 2], [5, 1]],
   expert: [[1, 1], [2, 2], [3, 3], [4, 3], [5, 2]],
+  rachel: [[1, 1], [2, 2], [3, 3], [4, 3], [5, 2]],
 };
-const KEEP_SINGLE: Record<Difficulty, number> = { easy: 0.45, medium: 0.3, hard: 0.2, expert: 0.1 };
-const BLANK_FRACTION: Record<Difficulty, number> = { easy: 0.15, medium: 0.25, hard: 0.3, expert: 0.35 };
+const KEEP_SINGLE: Record<Difficulty, number> = { easy: 0.45, medium: 0.3, hard: 0.2, expert: 0.1, rachel: 0.1 };
+const BLANK_FRACTION: Record<Difficulty, number> = { easy: 0.15, medium: 0.25, hard: 0.3, expert: 0.35, rachel: 0.35 };
 
 const HINT_WEIGHTS: Record<Difficulty, { sum: number; single: number; equal: number; distinct: number; ineq: number; slack: number }> = {
   easy: { sum: 3, single: 4, equal: 3, distinct: 1, ineq: 0.5, slack: 0 },
   medium: { sum: 2, single: 2, equal: 2, distinct: 2, ineq: 1.5, slack: 1 },
   hard: { sum: 1.5, single: 1, equal: 2, distinct: 2, ineq: 2.5, slack: 2 },
   expert: { sum: 1, single: 0.5, equal: 2, distinct: 2.5, ineq: 3, slack: 3 },
+  rachel: { sum: 1, single: 0.5, equal: 2, distinct: 2.5, ineq: 3, slack: 3 },
 };
 
 function growRegions(W: number, H: number, cells: number[], rng: Rng, diff: Difficulty) {
@@ -204,6 +216,7 @@ const EXTRA_WEIGHTS: Record<Difficulty, Record<ExtraKind, number>> = {
   medium: { step: 1.5, product: 1.5, extreme: 1.5, sumParity: 0.7 },
   hard: { step: 2, product: 1.5, extreme: 2, sumParity: 1.2 },
   expert: { step: 2.5, product: 1.5, extreme: 2.5, sumParity: 1.5 },
+  rachel: { step: 2.5, product: 1.5, extreme: 2.5, sumParity: 1.5 },
 };
 
 /** Picks a constraint that the solution `values` (per grid index) satisfies on `cells`. */
@@ -324,6 +337,8 @@ function uniquify(
   /** Switch to giving away single cells once half the budget is used; off for expert puzzles. */
   hurry = true,
 ): SolveResult {
+  const nodeLimit = UNIQUE_NODE_LIMIT;
+  const totalBudget = UNIQUIFY_BUDGET;
   const sumOf = (cs: number[], vals: number[]) => cs.reduce((s, c) => s + vals[c], 0);
   const exact = (cs: number[]): Constraint => ({ kind: 'sum', op: '=', value: sumOf(cs, values) });
   const inGrid = new Set(cells);
@@ -441,7 +456,7 @@ function uniquify(
   const search = () =>
     solve(problem(W, H, cells, regs, tray.types, tray.counts, maxPip), {
       limit: ALT_BATCH,
-      nodeLimit: UNIQUE_NODE_LIMIT,
+      nodeLimit,
       distinctValues: true,
     });
   /** Does a solution found earlier still satisfy every (possibly changed) region? */
@@ -457,7 +472,7 @@ function uniquify(
   let spent = res.nodes;
   for (let iter = 0; iter < 80; iter++) {
     if (res.aborted || res.solutions.length <= 1) return res;
-    if (spent > UNIQUIFY_BUDGET || Date.now() > deadline) return { ...res, aborted: true };
+    if (spent > totalBudget || Date.now() > deadline) return { ...res, aborted: true };
     // Rule out every alternative from this search before searching again.
     let alts = res.solutions.filter((s) => cells.some((c) => s.values[c] !== values[c]));
     // Only the pairing differs: same numbers on every cell. Accept.
@@ -468,7 +483,7 @@ function uniquify(
       // Border-preserving repairs keep the puzzle open (and the proof expensive);
       // once half the budget is gone, converge with the blunt ones.
       const progressed =
-        !hurry || spent < UNIQUIFY_BUDGET / 2
+        !hurry || spent < totalBudget / 2
           ? repairNicely(diff, alt.values) || repairBluntly(diff)
           : repairBluntly(diff) || repairNicely(diff, alt.values);
       if (!progressed) return res;
@@ -495,20 +510,21 @@ function ease(
   values: number[],
   dominoes: Domino[],
   target: Difficulty,
-): Difficulty {
+  deadline = Infinity,
+) {
   const exact = (cs: number[]): Constraint => ({ kind: 'sum', op: '=', value: cs.reduce((t, c) => t + values[c], 0) });
-  const grade = () => {
-    const regionOf = new Array(W * H).fill(-1);
-    regs.forEach((r, i) => r.cells.forEach((c) => (regionOf[c] = i)));
-    return gradeLogic({ width: W, height: H, cells, regionOf, constraints: regs.map((r) => r.constraint), dominoes });
-  };
+  const grade = () => gradeRegions(W, H, cells, regs, dominoes);
   // Deduction level the target grade allows (easy 1, medium 2, hard 3).
   const allowed = Math.min(3, DIFFICULTIES.indexOf(target) + 1);
   let res = grade();
   const original = regs.map((r) => ({ ...r }));
   for (let step = 0; step < 12 && DIFFICULTIES.indexOf(res.grade) > DIFFICULTIES.indexOf(target); step++) {
-    // Cells that needed harder reasoning than the target allows.
-    const unknown = cells.filter((_, i) => res.knownAt[i] > allowed);
+    if (Date.now() > deadline) break;
+    // Cells that needed harder reasoning than the target allows. If there are none,
+    // the puzzle is too hard because of how much lookahead it needs: target the
+    // cells that needed lookahead.
+    let unknown = cells.filter((_, i) => res.knownAt[i] > allowed);
+    if (!unknown.length) unknown = cells.filter((_, i) => res.knownAt[i] === allowed);
     // Prefer making an existing region exact; otherwise give a free cell its number.
     const reg = regs.find(
       (r) => !(r.constraint.kind === 'sum' && r.constraint.op === '=') && r.cells.some((c) => unknown.includes(c)),
@@ -524,9 +540,82 @@ function ease(
   if (!res.solved) {
     // Not provably unique any more: keep the puzzle as it was.
     regs.splice(0, regs.length, ...original);
-    return grade().grade;
+    return grade();
   }
-  return res.grade;
+  return res;
+}
+
+/**
+ * The tray. Rachel prefers look-alike pieces: doubles and 0s/max pips
+ * are easy to place, so they are picked less often.
+ */
+function pickTray(rng: Rng, n: number, opts: GenOptions): Domino[] {
+  const strength = opts.difficulty === 'rachel' ? 1 : 0;
+  const valueWeight = (v: number) => (v === 0 || v === opts.maxPip ? 1 - 0.5 * strength : 1);
+  if (opts.allowDuplicates) {
+    const values: [number, number][] = Array.from({ length: opts.maxPip + 1 }, (_, v) => [v, valueWeight(v)]);
+    return Array.from({ length: n }, () => [pickWeighted(rng, values), pickWeighted(rng, values)] as Domino);
+  }
+  const pool: [Domino, number][] = fullSet(opts.maxPip).map((d) => [
+    d,
+    valueWeight(d[0]) * valueWeight(d[1]) * (d[0] === d[1] ? 1 - 0.75 * strength : 1),
+  ]);
+  const out: Domino[] = [];
+  while (out.length < n && pool.length) {
+    const pick = pickWeighted(rng, pool.map((x, i) => [i, x[1]] as [number, number]));
+    out.push(pool[pick][0]);
+    pool.splice(pick, 1);
+  }
+  return out;
+}
+
+/**
+ * Makes a unique puzzle harder by loosening rules one region at a time
+ * (random order): drop the region's rule entirely if possible, otherwise turn
+ * an exact sum into a looser "<" or ">". A change is kept only if the puzzle
+ * still has a unique solution.
+ */
+function loosen(
+  W: number,
+  H: number,
+  cells: number[],
+  regs: EReg[],
+  tray: { types: [number, number][]; counts: number[] },
+  maxPip: number,
+  rng: Rng,
+  deadline: number,
+) {
+  // A small search budget per check: changes that are hard to verify are skipped.
+  const unique = () => {
+    const res = solve(problem(W, H, cells, regs, tray.types, tray.counts, maxPip), {
+      limit: 2,
+      nodeLimit: UNIQUE_NODE_LIMIT / 4,
+      distinctValues: true,
+    });
+    return !res.aborted && res.solutions.length === 1;
+  };
+  for (const reg of shuffle(rng, regs.slice())) {
+    if (Date.now() > deadline) return;
+    const i = regs.indexOf(reg);
+    regs.splice(i, 1);
+    if (unique()) continue;
+    regs.splice(i, 0, reg);
+    const con = reg.constraint;
+    if (con.kind !== 'sum' || con.op !== '=') continue;
+    const s = con.value;
+    const looser: Constraint[] = [
+      { kind: 'sum', op: '<', value: s + 2 },
+      { kind: 'sum', op: '>', value: s - 2 },
+      { kind: 'sum', op: '<', value: s + 1 },
+      { kind: 'sum', op: '>', value: s - 1 },
+    ];
+    for (const next of looser) {
+      if (next.kind === 'sum' && next.value < 0) continue;
+      reg.constraint = next;
+      if (unique()) break;
+      reg.constraint = con;
+    }
+  }
 }
 
 // ------------------------------------------------------------- conversions
@@ -574,9 +663,7 @@ export function generate(layout: Layout, opts: GenOptions, deadline = Date.now()
     if (Date.now() > deadline && attempt > 0) break;
     const tiles = randomTiling(W, H, cells, rng);
     if (!tiles) continue;
-    const doms: Domino[] = opts.allowDuplicates
-      ? tiles.map(() => [randInt(rng, 0, opts.maxPip), randInt(rng, 0, opts.maxPip)])
-      : shuffle(rng, fullSet(opts.maxPip)).slice(0, tiles.length);
+    const doms = pickTray(rng, tiles.length, opts);
     const values = new Array(W * H).fill(-1);
     const partner = new Array(W * H).fill(-1);
     tiles.forEach(([x, y], i) => {
@@ -603,10 +690,15 @@ export function generate(layout: Layout, opts: GenOptions, deadline = Date.now()
       ? uniquify(W, H, cells, regs, values, tray, opts.maxPip, opts.mode === 'auto', rng, opts.extras, deadline, opts.difficulty !== 'expert' || attempt % 2 === 1 || (!best && Date.now() > late))
       : solve(problem(W, H, cells, regs, tray.types, tray.counts, opts.maxPip), { limit: 2, nodeLimit: NODE_LIMIT, distinctValues: true });
     if (opts.requireUnique && (res.aborted || res.solutions.length !== 1)) continue;
+    // Rachel: loosen every rule the puzzle doesn't strictly need.
+    if (opts.mode === 'auto' && opts.difficulty === 'rachel') loosen(W, H, cells, regs, tray, opts.maxPip, rng, deadline);
     let stats = statsFrom(res, W, H, cells, regs, doms);
     // Too hard for the target: add clues where the logic solver got stuck.
     if (stats.solutions === 1 && DIFFICULTIES.indexOf(stats.rating) > target)
-      stats = { ...stats, rating: ease(W, H, cells, regs, values, doms, opts.difficulty) };
+    {
+      const eased = ease(W, H, cells, regs, values, doms, opts.difficulty, deadline);
+      stats = { ...stats, rating: eased.grade, entryPoints: eased.entryPoints };
+    }
 
     const solution = placementsFrom(W, cells, values, partner);
     const result = {
@@ -618,12 +710,16 @@ export function generate(layout: Layout, opts: GenOptions, deadline = Date.now()
     };
     // Distance to the target grade; when equally far, a harder puzzle wins.
     const got = DIFFICULTIES.indexOf(stats.rating);
-    // Expert: among equally hard puzzles, prefer fewer single-cell regions (free answers).
+    // Expert/Rachel: among equally hard puzzles, prefer fewer single-cell regions
+    // (free answers); Rachel also prefers fewer places to start.
     const singles = regs.filter((r) => r.cells.length === 1).length / Math.max(1, regs.length);
-    const score =
-      Math.abs(got - target) + (got < target ? 0.5 : 0) + (stats.aborted ? 1 : 0) + (opts.difficulty === 'expert' ? 0.4 * singles : 0);
+    const entries = stats.entryPoints ?? 0;
+    const rachel = opts.difficulty === 'rachel';
+    const penalty = isTop(opts.difficulty) ? 0.4 * singles + (rachel ? 0.05 * Math.min(8, Math.max(0, entries - 2)) : 0) : 0;
+    const score = Math.abs(got - target) + (got < target ? 0.5 : 0) + (stats.aborted ? 1 : 0) + penalty;
     if (!best || score < best.score) best = { result, score };
-    if (opts.mode !== 'auto' || score === 0 || (opts.difficulty === 'expert' && got === target && singles <= 0.3)) break;
+    const goodEnough = isTop(opts.difficulty) && got === target && singles <= 0.3 && (!rachel || entries <= 3);
+    if (opts.mode !== 'auto' || score === 0 || goodEnough) break;
   }
 
   if (best) return best.result;
@@ -703,19 +799,28 @@ export function verify(layout: Layout, dominoes: Domino[], maxPip: number): GenR
   };
 }
 
-const QUICK_SIZE: Record<Difficulty, [number, number]> = { easy: [8, 12], medium: [12, 18], hard: [16, 24], expert: [22, 30] };
+const QUICK_SIZE: Record<Difficulty, [number, number]> = {
+  easy: [8, 12],
+  medium: [12, 18],
+  hard: [16, 24],
+  expert: [22, 30],
+  rachel: [24, 32],
+};
 
 /** A random board shape plus a fully generated puzzle. */
 export function quickPuzzle(opts: Omit<GenOptions, 'mode'>) {
   const rng = mulberry32(opts.seed ?? randomSeed());
   const start = Date.now();
-  const budget = budgetFor(opts.difficulty) * (opts.difficulty === 'expert' ? 1 : 1.5);
-  // Expert is rare on big boards: if time runs short, fall back to easier settings on
+  const budget = budgetFor(opts.difficulty) * (isTop(opts.difficulty) ? 1 : 1.5);
+  // Top levels are rare on big boards: if time runs short, fall back to easier settings on
   // smaller boards so the button always returns a puzzle (labelled with its real grade).
+  // Each step gets its own slice of the budget: a step that starts out of time can't succeed.
   const plan: [Difficulty, number][] =
-    opts.difficulty === 'expert'
-      ? [['expert', 0.7], ['hard', 0.9], ['medium', 1]]
-      : [[opts.difficulty, 1], ['medium', 1]];
+    opts.difficulty === 'rachel'
+      ? [['rachel', 0.85], ['hard', 0.97], ['medium', 1]]
+      : opts.difficulty === 'expert'
+        ? [['expert', 0.7], ['hard', 0.9], ['medium', 1]]
+        : [[opts.difficulty, 0.8], ['medium', 1]];
   for (const [difficulty, share] of plan) {
     const [lo, hi] = QUICK_SIZE[difficulty];
     const n = randInt(rng, lo / 2, hi / 2) * 2;

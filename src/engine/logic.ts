@@ -36,6 +36,8 @@ export interface LogicResult {
   values: number[];
   /** The level at which each cell's number was worked out (5 = never). */
   knownAt: number[];
+  /** Forced moves available at the very start: places a player can begin. */
+  entryPoints: number;
   grade: Difficulty;
 }
 
@@ -177,6 +179,7 @@ function place(m: Model, s: State, p: number) {
 function regionSupport(m: Model, s: State, r: number): number[] | null {
   const cells = m.regionCells[r];
   const con = m.constraints[r];
+  const pos = m.regionPos[r];
   const k = cells.length;
   const support = new Array(k).fill(0);
   const vals = new Array(k).fill(0);
@@ -185,25 +188,68 @@ function regionSupport(m: Model, s: State, r: number): number[] | null {
     for (let v = 0; v < 31; v++) if (s.cand[c] & bit(v)) out.push(v);
     return out;
   });
+  const full = cells.map((c) => s.cand[c]);
+  // Smallest / largest sum the cells from i onwards can still add.
+  const sufMin = new Array(k + 1).fill(0);
+  const sufMax = new Array(k + 1).fill(0);
+  for (let i = k - 1; i >= 0; i--) {
+    sufMin[i] = sufMin[i + 1] + (options[i][0] ?? 0);
+    sufMax[i] = sufMax[i + 1] + (options[i][options[i].length - 1] ?? 0);
+  }
+  // Earlier cells adjacent to cell i (for the step rule).
+  const before = pos.map((a, i) => pos.slice(0, i).flatMap((b, j) => (Math.abs(a.r - b.r) + Math.abs(a.c - b.c) === 1 ? [j] : [])));
+
+  /** Can vals[0..i] still be completed? Exact checks happen at the leaves. */
+  const partialOk = (i: number, sum: number, prod: number): boolean => {
+    const v = vals[i];
+    switch (con.kind) {
+      case 'sum': {
+        const lo = sum + sufMin[i + 1];
+        const hi = sum + sufMax[i + 1];
+        return con.op === '=' ? lo <= con.value && con.value <= hi : con.op === '<' ? lo < con.value : hi > con.value;
+      }
+      case 'equal':
+        return v === vals[0];
+      case 'distinct':
+        for (let j = 0; j < i; j++) if (vals[j] === v) return false;
+        return true;
+      case 'extreme':
+        return con.which === 'max' ? v <= con.value : v >= con.value;
+      case 'product':
+        return con.value === 0 || (v !== 0 && con.value % prod === 0);
+      case 'step':
+        return before[i].every((j) => Math.abs(vals[j] - v) <= con.max);
+      default:
+        return true;
+    }
+  };
+
   let leaves = 0;
   let any = false;
-  const full = cells.map((c) => s.cand[c]);
-  const dfs = (i: number): boolean => {
+  let saturated = 0;
+  const dfs = (i: number, sum: number, prod: number): boolean => {
     if (i === k) {
       if (++leaves > GAC_LEAF_LIMIT) return false;
-      if (satisfies(con, vals, m.regionPos[r])) {
+      if (satisfies(con, vals, pos)) {
         any = true;
-        for (let j = 0; j < k; j++) support[j] |= bit(vals[j]);
+        for (let j = 0; j < k; j++) {
+          const was = support[j];
+          support[j] |= bit(vals[j]);
+          if (was !== full[j] && support[j] === full[j]) saturated++;
+        }
       }
       return true;
     }
     for (const v of options[i]) {
       vals[i] = v;
-      if (!dfs(i + 1)) return false;
+      if (!partialOk(i, sum + v, prod * v)) continue;
+      if (!dfs(i + 1, sum + v, prod * v)) return false;
+      // Every value of every cell is already supported: nothing left to learn.
+      if (saturated === k) return false;
     }
     return true;
   };
-  if (!dfs(0)) return full; // too big to enumerate: no pruning
+  if (!dfs(0, 0, 1)) return saturated === k ? support : full; // stopped early, or too big to enumerate
   return any ? support : null;
 }
 
@@ -356,7 +402,10 @@ function counting(m: Model, s: State): 'progress' | 'none' | 'contradiction' {
 }
 
 /** Level 3: find one placement whose consequences contradict, and rule it out. */
-function lookahead(m: Model, s: State): boolean {
+/** Cap on trial placements per grading; a puzzle needing more is graded Rachel. */
+const TRIAL_BUDGET = 1200;
+
+function lookahead(m: Model, s: State, budget: { trials: number }): boolean | 'exhausted' {
   const order: [number, number][] = [];
   for (let c = 0; c < m.n; c++) {
     if (s.value[c] >= 0) continue;
@@ -368,6 +417,7 @@ function lookahead(m: Model, s: State): boolean {
   for (const [, c] of order)
     for (const p of m.byCell[c]) {
       if (!s.alive[p]) continue;
+      if (--budget.trials < 0) return 'exhausted';
       const t = clone(s);
       place(m, t, p);
       if (!propagate(m, t, 2)) {
@@ -378,9 +428,40 @@ function lookahead(m: Model, s: State): boolean {
   return false;
 }
 
+/**
+ * Distinct forced moves on the untouched board: placements that are the only
+ * option for a cell or a domino, and cells whose region alone fixes their number.
+ */
+function entryPoints(m: Model, s: State): number {
+  const placements = new Set<number>();
+  const only = (ids: number[]) => {
+    const alive = ids.filter((p) => s.alive[p]);
+    if (alive.length === 1) placements.add(alive[0]);
+  };
+  m.byCell.forEach(only);
+  m.byDomino.forEach(only);
+  const cells = new Set<number>();
+  m.constraints.forEach((con, r) => {
+    if (con.kind === 'none') return;
+    const sup = regionSupport(m, s, r);
+    m.regionCells[r].forEach((c, j) => {
+      const v = s.cand[c] & (sup ? sup[j] : 0);
+      if (v && (v & (v - 1)) === 0 && s.cand[c] !== v) cells.add(c);
+    });
+  });
+  // A forced placement and a forced number on the same cell are one move.
+  for (const p of placements) {
+    cells.delete(m.pa[p]);
+    cells.delete(m.pb[p]);
+  }
+  return placements.size + cells.size;
+}
+
 export function gradeLogic(problem: LogicProblem): LogicResult {
   const m = buildModel(problem);
   const s = initialState(m);
+  const entries = entryPoints(m, s);
+  const budget = { trials: TRIAL_BUDGET };
   let level: LogicResult['level'] = 1;
   let lookaheads = 0;
   // Solved once every cell's number is known; which way identical numbers pair
@@ -399,16 +480,18 @@ export function gradeLogic(problem: LogicProblem): LogicResult {
       level = Math.max(level, 2) as LogicResult['level'];
       continue;
     }
-    if (lookahead(m, s)) {
+    const found = lookahead(m, s, budget);
+    if (found === true) {
       level = 3;
       lookaheads++;
       continue;
     }
+    // Stuck, or so much lookahead that grading gives up: beyond expert either way.
     level = 4;
     break;
   }
   const solved = determined();
-  return { solved, level, lookaheads, knownAt, values: Array.from(s.cand, (v) => (v & (v - 1) ? -1 : Math.log2(v))), grade: gradeOf(level, lookaheads) };
+  return { solved, level, lookaheads, knownAt, entryPoints: entries, values: Array.from(s.cand, (v) => (v & (v - 1) ? -1 : Math.log2(v))), grade: gradeOf(level, lookaheads) };
 }
 
 function changedState(a: State, b: State) {
@@ -420,10 +503,13 @@ function changedState(a: State, b: State) {
 
 /** Thresholds for the lookahead count; tuned by measuring generated puzzles. */
 export const EXPERT_LOOKAHEADS = 3;
+export const RACHEL_LOOKAHEADS = 30;
 
 function gradeOf(level: LogicResult['level'], lookaheads: number): Difficulty {
   if (level === 1) return 'easy';
   if (level === 2) return 'medium';
   if (level === 3 && lookaheads < EXPERT_LOOKAHEADS) return 'hard';
-  return 'expert';
+  if (level === 3 && lookaheads < RACHEL_LOOKAHEADS) return 'expert';
+  // Long chains of lookahead, or more than one level of it needed.
+  return 'rachel';
 }

@@ -7,6 +7,9 @@ import { newId } from '../../model/cells';
 import { runEngine } from '../../engine/client';
 import { randomSeed } from '../../engine/rng';
 
+/** Shown while the slower levels generate. */
+const WAIT: Partial<Record<Difficulty, string>> = { expert: ' (up to 10 s)', rachel: ' (up to 15 s)' };
+
 export function Home({ go }: { go: (hash: string) => void }) {
   const [library, setLibrary] = useState<Puzzle[]>(loadLibrary);
   const [busy, setBusy] = useState<Difficulty | null>(null);
@@ -18,7 +21,9 @@ export function Home({ go }: { go: (hash: string) => void }) {
   const quick = (difficulty: Difficulty) => {
     setBusy(difficulty);
     setError(null);
-    runEngine('quick', { ...options, difficulty, seed: randomSeed() })
+    // Rachel uses the double-nine set: fewer give-away single cells than with 0–6.
+    const opts = { ...options, maxPip: difficulty === 'rachel' ? (9 as const) : (6 as const) };
+    runEngine('quick', { ...opts, difficulty, seed: randomSeed() })
       .promise.then((res) => {
         if (!res.ok) return setError(res.error);
         const p: Puzzle = {
@@ -32,7 +37,7 @@ export function Home({ go }: { go: (hash: string) => void }) {
           regions: res.regions,
           dominoes: res.dominoes,
           solution: res.solution,
-          options,
+          options: opts,
         };
         saveQuick(p);
         saveProgress(p.id, null);
@@ -60,10 +65,10 @@ export function Home({ go }: { go: (hash: string) => void }) {
         <h1>Custom Pips</h1>
         <p className="muted">Place every domino so that each coloured region meets its condition.</p>
         <div className="quick">
-          {(['easy', 'medium', 'hard', 'expert'] as Difficulty[]).map((d) => (
+          {(['easy', 'medium', 'hard', 'expert', 'rachel'] as Difficulty[]).map((d) => (
             <button key={d} className={`quick-card ${d}`} onClick={() => quick(d)} disabled={!!busy}>
               <span className="quick-label">{d}</span>
-              <span className="muted small">{busy === d ? (d === 'expert' ? 'Generating… (up to 10 s)' : 'Generating…') : 'Random puzzle'}</span>
+              <span className="muted small">{busy === d ? `Generating…${WAIT[d] ?? ''}` : d === 'rachel' ? 'Much harder' : 'Random puzzle'}</span>
             </button>
           ))}
         </div>
