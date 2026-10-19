@@ -50,6 +50,16 @@ export interface PlayState {
   tray: Record<number, Orient>;
   elapsed: number;
   solved: boolean;
+  /** Saved board setups the player can go back to (missing in older saves). */
+  snapshots?: Snapshot[];
+}
+
+export interface Snapshot {
+  id: string;
+  /** Timer value (seconds) when it was taken. */
+  at: number;
+  placed: PlayState['placed'];
+  tray: PlayState['tray'];
 }
 export const loadProgress = (id: string) => read<PlayState>(PROGRESS + id);
 export const saveProgress = (id: string, s: PlayState | null) => write(PROGRESS + id, s);

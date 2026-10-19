@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Cell, Puzzle } from '../../model/types';
-import { DIRS, add, constraintRule, evaluate, key, ruleKey, sameCell } from '../../model/cells';
-import { type Orient, type PlayState, getPuzzle, loadProgress, savePuzzle, saveProgress } from '../../model/storage';
+import { DIRS, add, constraintRule, evaluate, key, newId, ruleKey, sameCell } from '../../model/cells';
+import { type Orient, type PlayState, type Snapshot, getPuzzle, loadProgress, savePuzzle, saveProgress } from '../../model/storage';
 import { samePuzzle, shareUrl } from '../../model/serialize';
 import { runEngine } from '../../engine/client';
 import { Board, type BoardDomino, cellAt, cellPixels } from '../board/Board';
 import { DominoShape, S } from '../board/DominoShape';
 
 const fresh = (): PlayState => ({ placed: {}, tray: {}, elapsed: 0, solved: false });
+
+/** Oldest snapshots are dropped beyond this. */
+const MAX_SNAPSHOTS = 12;
 
 const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
@@ -222,8 +225,27 @@ export function Play({
     setSt((s) => ({ ...s, placed }));
   };
 
+  const snapshots = st.snapshots ?? [];
+  const placedCount = Object.keys(st.placed).length;
+
+  const takeSnapshot = () => {
+    if (!placedCount) return flash('Place some dominoes first');
+    const snap: Snapshot = { id: newId(), at: st.elapsed, placed: { ...st.placed }, tray: { ...st.tray } };
+    setSt((s) => ({ ...s, snapshots: [...(s.snapshots ?? []), snap].slice(-MAX_SNAPSHOTS) }));
+    flash('Snapshot saved');
+  };
+
+  /** Puts a snapshot's board back; the timer keeps running. */
+  const restore = (snap: Snapshot) => setSt((s) => ({ ...s, placed: { ...snap.placed }, tray: { ...snap.tray } }));
+
+  const dropSnapshot = (id: string) => setSt((s) => ({ ...s, snapshots: (s.snapshots ?? []).filter((x) => x.id !== id) }));
+
+  /** Takes every domino off the board; the timer and snapshots stay. */
+  const clear = () => setSt((s) => ({ ...s, placed: {} }));
+
   const reset = () => {
-    setSt(fresh());
+    // Start over, but keep snapshots: they are only removed with their × button.
+    setSt((s) => ({ ...fresh(), snapshots: s.snapshots }));
     setDismissed(false);
   };
 
@@ -257,7 +279,13 @@ export function Play({
         <span className="timer">{formatTime(st.elapsed)}</span>
       </div>
       <div className="play-actions">
-        <button className="btn ghost" onClick={reset}>
+        <button className="btn ghost" onClick={takeSnapshot} disabled={st.solved} title="Save the current board so you can come back to it">
+          Snapshot
+        </button>
+        <button className="btn ghost" onClick={clear} disabled={st.solved || !placedCount} title="Take all dominoes off the board (the timer keeps running)">
+          Clear
+        </button>
+        <button className="btn ghost" onClick={reset} title="Start over: empty board and timer back to 0:00">
           Reset
         </button>
         <button className="btn ghost" onClick={reveal}>
@@ -317,6 +345,42 @@ export function Play({
             );
           })}
         </div>
+        {snapshots.length > 0 && (
+          <section className="snapshots" aria-label="Snapshots">
+            <h4>Snapshots</h4>
+            <div className="snapshot-list">
+              {snapshots.map((snap, i) => (
+                <div key={snap.id} className="snapshot">
+                  <button
+                    className="snapshot-board"
+                    onClick={() => restore(snap)}
+                    disabled={st.solved}
+                    title="Go back to this board (the timer keeps running)"
+                  >
+                    <Board
+                      width={puzzle.width}
+                      height={puzzle.height}
+                      cells={puzzle.cells}
+                      regions={puzzle.regions}
+                      dominoes={Object.entries(snap.placed).map(([d, p]) => {
+                        const [a, b] = cellsOf(p);
+                        return { id: d, a, b, pips: puzzle.dominoes[Number(d)] };
+                      })}
+                    />
+                  </button>
+                  <div className="snapshot-meta">
+                    <span>
+                      #{i + 1} · {formatTime(snap.at)} · {Object.keys(snap.placed).length}/{puzzle.dominoes.length}
+                    </span>
+                    <button className="snapshot-delete" onClick={() => dropSnapshot(snap.id)} aria-label={`Delete snapshot ${i + 1}`}>
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
         <p className="hint">Drag dominoes onto the board. Tap a domino to rotate it.</p>
         {rules.length > 0 && (
           <details className="legend">
