@@ -64,5 +64,9 @@ export interface Snapshot {
 export const loadProgress = (id: string) => read<PlayState>(PROGRESS + id);
 export const saveProgress = (id: string, s: PlayState | null) => write(PROGRESS + id, s);
 
+/** The name shown to duel opponents. */
+export const loadName = () => read<string>('pips.name') ?? '';
+export const saveName = (name: string) => write('pips.name', name);
+
 export const loadTheme = () => read<string>(THEME) ?? 'classic';
 export const saveTheme = (t: string) => write(THEME, t);

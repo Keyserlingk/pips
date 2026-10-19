@@ -179,3 +179,32 @@ label.radio span { display: block; }
 .snapshot-meta { display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--muted); }
 .snapshot-delete { border: 0; background: none; color: var(--muted); font-size: 1rem; line-height: 1; cursor: pointer; padding: 0 4px; }
 .snapshot-delete:hover { color: var(--bad); }
+
+/* Duels */
+.center { justify-content: center; text-align: center; }
+.duel-entry { margin-top: 18px; }
+.duel-start { max-width: 520px; margin: 0 auto; }
+.duel-start .panel > * + * { margin-top: 12px; }
+.code-input { width: 110px; text-transform: uppercase; letter-spacing: 0.2em; font-weight: 800; }
+.duel { display: flex; flex-direction: column; gap: 14px; }
+.duel-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.duel-title { font-weight: 800; }
+.duel-code { font-family: ui-monospace, monospace; letter-spacing: 0.15em; background: var(--cell-bg); border-radius: 8px; padding: 2px 8px; }
+.duel-code.big { display: inline-block; font-size: 2.4rem; padding: 6px 18px; margin: 4px 0 10px; }
+.duel-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+.duel-notice { margin: 0; text-align: center; color: var(--muted); }
+.duel-lobby { display: flex; flex-direction: column; gap: 16px; max-width: 560px; width: 100%; margin: 0 auto; }
+.duel-invite { text-align: center; }
+.duel-link { font-size: 0.8rem; word-break: break-all; color: var(--muted); }
+.duel-players { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.duel-player { border: 1px solid var(--border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.duel-countdown { font-size: 7rem; font-weight: 800; text-align: center; padding: 60px 0; animation: pop 0.25s ease; }
+.duel-opponent { display: flex; align-items: center; gap: 10px; max-width: 560px; width: 100%; margin: 0 auto; font-weight: 700; }
+.duel-progress { flex: 1; height: 10px; border-radius: 999px; background: var(--cell-bg); overflow: hidden; }
+.duel-progress > div { height: 100%; background: var(--accent); transition: width 0.3s ease; }
+.duel-result { position: fixed; inset: auto 0 24px 0; display: flex; justify-content: center; z-index: 70; padding: 0 16px; pointer-events: none; }
+.duel-result .modal { pointer-events: auto; box-shadow: 0 12px 40px rgb(0 0 0 / 0.25); }
+@media (max-width: 520px) {
+  .duel-players { grid-template-columns: 1fr; }
+}
+.duel-player .pill { align-self: flex-start; margin: 0; }

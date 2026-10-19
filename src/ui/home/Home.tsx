@@ -72,6 +72,11 @@ export function Home({ go }: { go: (hash: string) => void }) {
             </button>
           ))}
         </div>
+        <div className="row center duel-entry">
+          <button className="btn" onClick={() => go('#/duel')}>
+            ⚔ Duel a friend
+          </button>
+        </div>
         <label className="check extras-toggle">
           <input type="checkbox" checked={withExtras} onChange={(e) => setWithExtras(e.target.checked)} />
           Include extra constraints (max step, product, max/min, sum parity)

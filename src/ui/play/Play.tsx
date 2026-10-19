@@ -30,6 +30,17 @@ interface DragInfo {
 
 type SavedState = 'none' | 'saved' | 'changed';
 
+/** Hooks for a live duel: the duel screen owns the clock and the result. */
+export interface DuelHooks {
+  /** When this round started (local clock, ms since epoch). */
+  startAt: number;
+  /** No more moves (the round is over). */
+  locked: boolean;
+  onProgress: (placed: number) => void;
+  /** Called once, with the final placements (checked by the referee) and the time taken. */
+  onSolved: (placed: PlayState['placed'], ms: number) => void;
+}
+
 /** Is this puzzle in the library, and is the stored copy the same as this one? */
 function libraryState(puzzle: Puzzle): SavedState {
   const stored = getPuzzle(puzzle.id);
@@ -42,6 +53,7 @@ export function Play({
   onHome,
   onEdit,
   onRemix,
+  duel,
 }: {
   puzzle: Puzzle;
   /** Where the puzzle came from: the library, a random puzzle, or a share link. */
@@ -49,10 +61,12 @@ export function Play({
   onHome: () => void;
   onEdit?: () => void;
   onRemix?: () => void;
+  /** Present during a live duel: no saving, sharing or revealing, and a shared clock. */
+  duel?: DuelHooks;
 }) {
   const [savedState, setSavedState] = useState<SavedState>(() => libraryState(puzzle));
   const [solution, setSolution] = useState(puzzle.solution);
-  const [st, setSt] = useState<PlayState>(() => loadProgress(puzzle.id) ?? fresh());
+  const [st, setSt] = useState<PlayState>(() => (duel ? null : loadProgress(puzzle.id)) ?? fresh());
   const [drag, setDrag] = useState<{ idx: number; half: 0 | 1; orient: Orient; x: number; y: number; px: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
@@ -60,16 +74,23 @@ export function Play({
   const dragRef = useRef<DragInfo | null>(null);
   const active = useMemo(() => new Set(puzzle.cells.map(key)), [puzzle]);
 
-  useEffect(() => saveProgress(puzzle.id, st), [puzzle.id, st]);
+  const duelRef = useRef(duel);
+  duelRef.current = duel;
+  const startAt = duel?.startAt;
 
-  // Timer
+  useEffect(() => {
+    if (!duelRef.current) saveProgress(puzzle.id, st);
+  }, [puzzle.id, st]);
+
+  // Timer. In a duel it follows the shared start time, so it can't drift or pause.
   useEffect(() => {
     if (st.solved) return;
     const t = setInterval(() => {
-      if (!document.hidden) setSt((s) => ({ ...s, elapsed: s.elapsed + 1 }));
-    }, 1000);
+      if (startAt !== undefined) setSt((s) => ({ ...s, elapsed: Math.max(0, Math.floor((Date.now() - startAt) / 1000)) }));
+      else if (!document.hidden) setSt((s) => ({ ...s, elapsed: s.elapsed + 1 }));
+    }, startAt !== undefined ? 250 : 1000);
     return () => clearInterval(t);
-  }, [st.solved]);
+  }, [st.solved, startAt]);
 
   const cellsOf = (p: { anchor: Cell; orient: Orient }) => [p.anchor, add(p.anchor, DIRS[p.orient])] as const;
 
@@ -96,8 +117,16 @@ export function Play({
   const evaluation = useMemo(() => evaluate(puzzle, values), [puzzle, values]);
 
   useEffect(() => {
-    if (evaluation.solved && !st.solved) setSt((s) => ({ ...s, solved: true }));
-  }, [evaluation.solved, st.solved]);
+    if (!evaluation.solved || st.solved) return;
+    setSt((s) => ({ ...s, solved: true }));
+    const d = duelRef.current;
+    if (d) d.onSolved(st.placed, Date.now() - d.startAt);
+  }, [evaluation.solved, st.solved, st.placed]);
+
+  const placedTotal = Object.keys(st.placed).length;
+  useEffect(() => {
+    duelRef.current?.onProgress(placedTotal);
+  }, [placedTotal]);
 
   const fits = (s: PlayState, idx: number, anchor: Cell, orient: Orient) => {
     const cells = [anchor, add(anchor, DIRS[orient])];
@@ -141,7 +170,7 @@ export function Play({
   };
 
   const startDrag = (e: React.PointerEvent, idx: number, half: 0 | 1, orient: Orient, from: 'tray' | 'board') => {
-    if (st.solved) return;
+    if (st.solved || duel?.locked) return;
     e.preventDefault();
     dragRef.current = { idx, half, orient, from, startX: e.clientX, startY: e.clientY, moved: false };
     const px = cellPixels(svgRef.current, puzzle.width, puzzle.height);
@@ -195,7 +224,10 @@ export function Play({
   };
 
   const reveal = async () => {
-    if (!confirm('Reveal the solution?')) return;
+    if (confirm('Reveal the solution?')) await revealNow();
+  };
+
+  const revealNow = async () => {
     let sol = solution;
     if (!sol) {
       // Shared links carry no answer; work it out here.
@@ -224,6 +256,18 @@ export function Play({
     }
     setSt((s) => ({ ...s, placed }));
   };
+
+  // Development builds only: lets automated browser tests finish a puzzle.
+  const revealRef = useRef(revealNow);
+  revealRef.current = revealNow;
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const w = window as unknown as { __pipsSolve?: () => Promise<void> };
+    w.__pipsSolve = () => revealRef.current();
+    return () => {
+      delete w.__pipsSolve;
+    };
+  }, []);
 
   const snapshots = st.snapshots ?? [];
   const placedCount = Object.keys(st.placed).length;
@@ -269,9 +313,13 @@ export function Play({
   return (
     <div className="play">
       <div className="play-bar">
-        <button className="btn ghost" onClick={onHome}>
-          ← Back
-        </button>
+        {duel ? (
+          <span className="timer" />
+        ) : (
+          <button className="btn ghost" onClick={onHome}>
+            ← Back
+          </button>
+        )}
         <div className="play-title">
           <strong>{puzzle.title || 'Untitled'}</strong>
           {puzzle.difficulty && <span className={`pill ${puzzle.difficulty}`}>{puzzle.difficulty}</span>}
@@ -279,33 +327,37 @@ export function Play({
         <span className="timer">{formatTime(st.elapsed)}</span>
       </div>
       <div className="play-actions">
-        <button className="btn ghost" onClick={takeSnapshot} disabled={st.solved} title="Save the current board so you can come back to it">
+        <button className="btn ghost" onClick={takeSnapshot} disabled={st.solved || duel?.locked} title="Save the current board so you can come back to it">
           Snapshot
         </button>
-        <button className="btn ghost" onClick={clear} disabled={st.solved || !placedCount} title="Take all dominoes off the board (the timer keeps running)">
+        <button className="btn ghost" onClick={clear} disabled={st.solved || duel?.locked || !placedCount} title="Take all dominoes off the board (the timer keeps running)">
           Clear
         </button>
-        <button className="btn ghost" onClick={reveal}>
-          Reveal
-        </button>
-        <button className="btn ghost" onClick={share}>
-          Share
-        </button>
-        {source !== 'local' && (
-          <button className="btn" onClick={save} disabled={savedState === 'saved'}>
-            {savedState === 'none' ? 'Save to My puzzles' : savedState === 'changed' ? 'Replace my saved copy' : 'Saved ✓'}
-          </button>
-        )}
-        {onEdit ? (
-          <button className="btn ghost" onClick={onEdit}>
-            Edit
-          </button>
-        ) : (
-          onRemix && (
-            <button className="btn ghost" onClick={onRemix} title="Open a copy in the editor">
-              Remix
+        {!duel && (
+          <>
+            <button className="btn ghost" onClick={reveal}>
+              Reveal
             </button>
-          )
+            <button className="btn ghost" onClick={share}>
+              Share
+            </button>
+            {source !== 'local' && (
+              <button className="btn" onClick={save} disabled={savedState === 'saved'}>
+                {savedState === 'none' ? 'Save to My puzzles' : savedState === 'changed' ? 'Replace my saved copy' : 'Saved ✓'}
+              </button>
+            )}
+            {onEdit ? (
+              <button className="btn ghost" onClick={onEdit}>
+                Edit
+              </button>
+            ) : (
+              onRemix && (
+                <button className="btn ghost" onClick={onRemix} title="Open a copy in the editor">
+                  Remix
+                </button>
+              )
+            )}
+          </>
         )}
       </div>
 
@@ -394,7 +446,7 @@ export function Play({
       {drag && <DragGhost {...drag} dominoes={puzzle.dominoes} />}
       {toast && <div className="toast">{toast}</div>}
 
-      {st.solved && !dismissed && (
+      {st.solved && !dismissed && !duel && (
         <div className="modal-backdrop">
           <div className="modal">
             <h2>Solved!</h2>

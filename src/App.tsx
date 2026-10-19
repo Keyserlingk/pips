@@ -6,6 +6,8 @@ import { THEMES } from './styles/themes';
 import { Home } from './ui/home/Home';
 import { Play } from './ui/play/Play';
 import { Editor } from './ui/editor/Editor';
+import { Duel, DuelStart } from './ui/duel/Duel';
+import { normaliseCode } from './duel/protocol';
 
 function useHash() {
   const [hash, setHash] = useState(location.hash || '#/');
@@ -53,6 +55,9 @@ export function App() {
     if (parts[1] === 'quick') page = play(loadQuick(), 'quick');
     else if (parts[1] === 'local') page = play(getPuzzle(parts[2]), 'local');
     else page = play(parts[1] === 's' ? decodeLegacy(parts[2] ?? '') : null, 'shared');
+  } else if (parts[0] === 'duel') {
+    const code = parts[1] ? normaliseCode(parts[1]) : null;
+    page = code ? <Duel key={code} code={code} wantHost={parts[2] === 'host'} go={go} /> : <DuelStart go={go} />;
   } else if (parts[0] === 'edit') {
     page = <Editor key={parts[1]} id={parts[1] || 'new'} onHome={home} onPlay={(id) => go(`#/play/local/${id}`)} />;
   } else {
