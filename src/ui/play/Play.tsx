@@ -285,9 +285,6 @@ export function Play({
         <button className="btn ghost" onClick={clear} disabled={st.solved || !placedCount} title="Take all dominoes off the board (the timer keeps running)">
           Clear
         </button>
-        <button className="btn ghost" onClick={reset} title="Start over: empty board and timer back to 0:00">
-          Reset
-        </button>
         <button className="btn ghost" onClick={reveal}>
           Reveal
         </button>
