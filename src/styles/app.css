@@ -208,3 +208,34 @@ label.radio span { display: block; }
   .duel-players { grid-template-columns: 1fr; }
 }
 .duel-player .pill { align-self: flex-start; margin: 0; }
+
+/* Duel reactions */
+.duel-reactions { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.duel-reactions button {
+  width: 42px; height: 42px; font-size: 1.35rem; line-height: 1; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
+  transition: transform 0.1s ease;
+}
+.duel-reactions button:hover { transform: translateY(-2px) scale(1.08); }
+.duel-reactions button:active { transform: scale(0.92); }
+.reaction-layer { position: fixed; inset: 0; pointer-events: none; z-index: 80; overflow: hidden; }
+.reaction {
+  position: absolute; bottom: 110px; font-size: 2.8rem; line-height: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  animation: float-up 2.6s ease-out forwards;
+}
+.reaction span {
+  font-size: 0.75rem; font-weight: 800; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px;
+}
+.reaction.opp span { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+@keyframes float-up {
+  0% { transform: translateY(24px) scale(0.6); opacity: 0; }
+  12% { transform: translateY(0) scale(1.15); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: translateY(-280px) scale(1); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reaction { animation: fade-out 2.6s ease forwards; }
+  @keyframes fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+}

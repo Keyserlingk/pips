@@ -6,7 +6,7 @@ import { decodeShare, encodeShare } from '../../model/serialize';
 import { runEngine } from '../../engine/client';
 import { randomSeed } from '../../engine/rng';
 import { type DuelNet, openRoom } from '../../duel/net';
-import { type DuelMsg, type Placed, PROTOCOL, isHost, normaliseCode, randomCode } from '../../duel/protocol';
+import { type DuelMsg, EMOJIS, type Placed, PROTOCOL, isHost, normaliseCode, randomCode } from '../../duel/protocol';
 import { validFinish } from '../../duel/referee';
 import { Play } from '../play/Play';
 
@@ -14,6 +14,17 @@ const LEVELS: Difficulty[] = ['easy', 'medium', 'hard', 'expert', 'rachel'];
 const COUNTDOWN_MS = 3000;
 /** After this long alone in the room, explain what might be wrong. */
 const LONELY_HINT_MS = 30_000;
+/** How long a reaction stays on screen, and the minimum gap between sending two. */
+const REACTION_MS = 2600;
+const REACTION_COOLDOWN_MS = 600;
+
+interface Reaction {
+  id: number;
+  from: 'me' | 'opp';
+  e: string;
+  /** Horizontal position, % of the screen width. */
+  x: number;
+}
 
 const formatMs = (ms: number) => {
   const tenths = Math.round(ms / 100);
@@ -141,6 +152,8 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
   const [ready, setReady] = useState(false);
   const [lonely, setLonely] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const [reactions, setReactions] = useState<Reaction[]>([]);
+  const lastReaction = useRef(0);
   const sRef = useRef(s);
   sRef.current = s;
   const nameRef = useRef(name);
@@ -157,6 +170,21 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
   const toOpp = (msg: DuelMsg) => {
     const opp = sRef.current.opp;
     if (opp?.connected) send(msg, opp.id);
+  };
+
+  /** Floats an emoji up the screen: yours on the left, the opponent's on the right. */
+  const showReaction = (from: Reaction['from'], e: string) => {
+    const id = Math.random();
+    const x = (from === 'me' ? 12 : 62) + Math.random() * 26;
+    setReactions((rs) => [...rs.slice(-11), { id, from, e, x }]);
+    setTimeout(() => setReactions((rs) => rs.filter((r) => r.id !== id)), REACTION_MS);
+  };
+
+  const react = (e: string) => {
+    if (Date.now() - lastReaction.current < REACTION_COOLDOWN_MS) return;
+    lastReaction.current = Date.now();
+    toOpp({ t: 'emoji', e });
+    showReaction('me', e);
   };
 
   const applyResult = (winner: 'host' | 'guest', hostMs: number | null, guestMs: number | null) =>
@@ -269,6 +297,9 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
         // Start when the host does: allow for half the round trip.
         if (!x.host && msg.round === x.round)
           update((y) => ({ ...y, phase: 'countdown', startAt: Date.now() + msg.inMs - y.rtt / 2 }));
+        break;
+      case 'emoji':
+        if ((EMOJIS as readonly string[]).includes(msg.e)) showReaction('opp', msg.e);
         break;
       case 'progress':
         if (msg.round === x.round) update((y) => ({ ...y, opp: y.opp && { ...y.opp, placed: msg.placed } }));
@@ -435,6 +466,23 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
         </div>
       </div>
       {s.notice && <p className="duel-notice">{s.notice}</p>}
+      {opp?.connected && (
+        <div className="duel-reactions" aria-label="Send a reaction">
+          {EMOJIS.map((e) => (
+            <button key={e} onClick={() => react(e)} aria-label={`React ${e}`}>
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="reaction-layer" aria-live="polite">
+        {reactions.map((r) => (
+          <div key={r.id} className={`reaction ${r.from}`} style={{ left: `${r.x}%` }}>
+            {r.e}
+            <span>{r.from === 'me' ? 'You' : oppName}</span>
+          </div>
+        ))}
+      </div>
 
       {s.phase === 'lobby' && (
         <section className="panel duel-lobby">

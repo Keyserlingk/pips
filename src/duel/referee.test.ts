@@ -49,6 +49,7 @@ describe('duel protocol', () => {
   });
   it('ignores unknown messages', () => {
     expect(parseMsg('{"t":"hello","name":"x","host":true,"paired":false,"v":1}')).toMatchObject({ t: 'hello' });
+    expect(parseMsg('{"t":"emoji","e":"🔥"}')).toMatchObject({ t: 'emoji', e: '🔥' });
     expect(parseMsg('{"t":"hack"}')).toBeNull();
     expect(parseMsg('not json')).toBeNull();
   });

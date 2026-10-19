@@ -20,10 +20,14 @@ export type DuelMsg =
   | { t: 'progress'; round: number; placed: number }
   | { t: 'finished'; round: number; ms: number; placed: Placed }
   | { t: 'result'; round: number; winner: 'host' | 'guest'; hostMs: number | null; guestMs: number | null }
+  | { t: 'emoji'; e: string }
   | { t: 'leave' };
 
+/** The only reactions players can send (anything else is dropped): trash talk only. */
+export const EMOJIS = ['🌶️', '🔥', '😈', '😏', '😤', '💀', '🥵', '👀'] as const;
+
 const TYPES = new Set([
-  'hello', 'ready', 'level', 'lobby', 'generating', 'puzzle', 'loaded', 'go', 'progress', 'finished', 'result', 'leave',
+  'hello', 'ready', 'level', 'lobby', 'generating', 'puzzle', 'loaded', 'go', 'progress', 'finished', 'result', 'emoji', 'leave',
 ]);
 
 export function parseMsg(raw: unknown): DuelMsg | null {
