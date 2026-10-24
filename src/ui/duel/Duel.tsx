@@ -9,6 +9,7 @@ import { type DuelNet, openRoom } from '../../duel/net';
 import { type DuelMsg, EMOJIS, type Placed, PROTOCOL, isHost, normaliseCode, randomCode } from '../../duel/protocol';
 import { validFinish } from '../../duel/referee';
 import { Play } from '../play/Play';
+import { formatMs } from '../format';
 
 const LEVELS: Difficulty[] = ['easy', 'medium', 'hard', 'expert', 'rachel'];
 const COUNTDOWN_MS = 3000;
@@ -26,11 +27,6 @@ interface Reaction {
   x: number;
 }
 
-const formatMs = (ms: number) => {
-  const tenths = Math.round(ms / 100);
-  const s = Math.floor(tenths / 10);
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}.${tenths % 10}`;
-};
 
 const inviteUrl = (code: string) => `${location.origin}${location.pathname}#/duel/${code}`;
 
@@ -582,7 +578,7 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
             puzzle={s.puzzle}
             source="shared"
             onHome={leave}
-            duel={{
+            race={{
               startAt: s.startAt,
               locked: s.phase === 'result',
               onProgress: (placed) => toOpp({ t: 'progress', round: sRef.current.round, placed }),

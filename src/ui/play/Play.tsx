@@ -30,8 +30,8 @@ interface DragInfo {
 
 type SavedState = 'none' | 'saved' | 'changed';
 
-/** Hooks for a live duel: the duel screen owns the clock and the result. */
-export interface DuelHooks {
+/** Hooks for a race (live race or ghost race): the race screen owns the clock and the result. */
+export interface RaceHooks {
   /** When this round started (local clock, ms since epoch). */
   startAt: number;
   /** No more moves (the round is over). */
@@ -53,7 +53,7 @@ export function Play({
   onHome,
   onEdit,
   onRemix,
-  duel,
+  race,
 }: {
   puzzle: Puzzle;
   /** Where the puzzle came from: the library, a random puzzle, or a share link. */
@@ -61,12 +61,12 @@ export function Play({
   onHome: () => void;
   onEdit?: () => void;
   onRemix?: () => void;
-  /** Present during a live duel: no saving, sharing or revealing, and a shared clock. */
-  duel?: DuelHooks;
+  /** Present during a race: no saving, sharing or revealing, and a shared clock. */
+  race?: RaceHooks;
 }) {
   const [savedState, setSavedState] = useState<SavedState>(() => libraryState(puzzle));
   const [solution, setSolution] = useState(puzzle.solution);
-  const [st, setSt] = useState<PlayState>(() => (duel ? null : loadProgress(puzzle.id)) ?? fresh());
+  const [st, setSt] = useState<PlayState>(() => (race ? null : loadProgress(puzzle.id)) ?? fresh());
   const [drag, setDrag] = useState<{ idx: number; half: 0 | 1; orient: Orient; x: number; y: number; px: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
@@ -74,15 +74,15 @@ export function Play({
   const dragRef = useRef<DragInfo | null>(null);
   const active = useMemo(() => new Set(puzzle.cells.map(key)), [puzzle]);
 
-  const duelRef = useRef(duel);
-  duelRef.current = duel;
-  const startAt = duel?.startAt;
+  const raceRef = useRef(race);
+  raceRef.current = race;
+  const startAt = race?.startAt;
 
   useEffect(() => {
-    if (!duelRef.current) saveProgress(puzzle.id, st);
+    if (!raceRef.current) saveProgress(puzzle.id, st);
   }, [puzzle.id, st]);
 
-  // Timer. In a duel it follows the shared start time, so it can't drift or pause.
+  // Timer. In a race it follows the shared start time, so it can't drift or pause.
   useEffect(() => {
     if (st.solved) return;
     const t = setInterval(() => {
@@ -119,13 +119,13 @@ export function Play({
   useEffect(() => {
     if (!evaluation.solved || st.solved) return;
     setSt((s) => ({ ...s, solved: true }));
-    const d = duelRef.current;
+    const d = raceRef.current;
     if (d) d.onSolved(st.placed, Date.now() - d.startAt);
   }, [evaluation.solved, st.solved, st.placed]);
 
   const placedTotal = Object.keys(st.placed).length;
   useEffect(() => {
-    duelRef.current?.onProgress(placedTotal);
+    raceRef.current?.onProgress(placedTotal);
   }, [placedTotal]);
 
   const fits = (s: PlayState, idx: number, anchor: Cell, orient: Orient) => {
@@ -170,7 +170,7 @@ export function Play({
   };
 
   const startDrag = (e: React.PointerEvent, idx: number, half: 0 | 1, orient: Orient, from: 'tray' | 'board') => {
-    if (st.solved || duel?.locked) return;
+    if (st.solved || race?.locked) return;
     e.preventDefault();
     dragRef.current = { idx, half, orient, from, startX: e.clientX, startY: e.clientY, moved: false };
     const px = cellPixels(svgRef.current, puzzle.width, puzzle.height);
@@ -313,7 +313,7 @@ export function Play({
   return (
     <div className="play">
       <div className="play-bar">
-        {duel ? (
+        {race ? (
           <span className="timer" />
         ) : (
           <button className="btn ghost" onClick={onHome}>
@@ -327,13 +327,13 @@ export function Play({
         <span className="timer">{formatTime(st.elapsed)}</span>
       </div>
       <div className="play-actions">
-        <button className="btn ghost" onClick={takeSnapshot} disabled={st.solved || duel?.locked} title="Save the current board so you can come back to it">
+        <button className="btn ghost" onClick={takeSnapshot} disabled={st.solved || race?.locked} title="Save the current board so you can come back to it">
           Snapshot
         </button>
-        <button className="btn ghost" onClick={clear} disabled={st.solved || duel?.locked || !placedCount} title="Take all dominoes off the board (the timer keeps running)">
+        <button className="btn ghost" onClick={clear} disabled={st.solved || race?.locked || !placedCount} title="Take all dominoes off the board (the timer keeps running)">
           Clear
         </button>
-        {!duel && (
+        {!race && (
           <>
             <button className="btn ghost" onClick={reveal}>
               Reveal
@@ -446,7 +446,7 @@ export function Play({
       {drag && <DragGhost {...drag} dominoes={puzzle.dominoes} />}
       {toast && <div className="toast">{toast}</div>}
 
-      {st.solved && !dismissed && !duel && (
+      {st.solved && !dismissed && !race && (
         <div className="modal-backdrop">
           <div className="modal">
             <h2>Solved!</h2>

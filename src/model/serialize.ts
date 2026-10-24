@@ -81,21 +81,99 @@ async function pipe(data: Uint8Array, stream: CompressionStream | DecompressionS
 
 const canCompress = () => typeof CompressionStream !== 'undefined';
 
-export async function encodeShare(p: Puzzle): Promise<string> {
-  const json = new TextEncoder().encode(JSON.stringify(toCompact(p)));
+/** JSON → (compressed) base64url, prefixed z (deflate) or j (plain). */
+async function pack(value: unknown): Promise<string> {
+  const json = new TextEncoder().encode(JSON.stringify(value));
   if (!canCompress()) return 'j' + toBase64Url(json);
   return 'z' + toBase64Url(await pipe(json, new CompressionStream('deflate')));
 }
 
+async function unpack(code: string): Promise<unknown> {
+  const bytes = fromBase64Url(code.slice(1));
+  const json = code[0] === 'z' ? await pipe(bytes, new DecompressionStream('deflate')) : bytes;
+  return JSON.parse(new TextDecoder().decode(json));
+}
+
+export const encodeShare = (p: Puzzle) => pack(toCompact(p));
+
 export async function decodeShare(code: string): Promise<Puzzle | null> {
   try {
-    const bytes = fromBase64Url(code.slice(1));
-    const json = code[0] === 'z' ? await pipe(bytes, new DecompressionStream('deflate')) : bytes;
-    const p = fromCompact(JSON.parse(new TextDecoder().decode(json)));
+    const p = fromCompact((await unpack(code)) as Compact);
     return isPuzzle(p) ? p : null;
   } catch {
     return null;
   }
+}
+
+// ------------------------------------------------------------- ghost links
+
+/** One recorded attempt: who, how long, and how many pieces were placed when. */
+export interface GhostRun {
+  name: string;
+  ms: number;
+  /** [ms since start, pieces on the board] each time the count changed. */
+  steps: [number, number][];
+}
+
+/** Runs carried by a link (the fastest are kept) and recorded steps per run. */
+export const MAX_GHOST_RUNS = 5;
+const MAX_STEPS = 300;
+
+/** Steps are stored as tenths of a second since the previous step, then the count. */
+function packSteps(steps: [number, number][]): number[] {
+  // Very long runs: keep an evenly spaced subset (and the last step).
+  const every = Math.ceil(steps.length / MAX_STEPS);
+  const kept = steps.filter((_, i) => i % every === 0 || i === steps.length - 1);
+  const out: number[] = [];
+  let prev = 0;
+  for (const [ms, count] of kept) {
+    const t = Math.round(ms / 100);
+    out.push(t - prev, count);
+    prev = t;
+  }
+  return out;
+}
+
+function unpackSteps(flat: number[]): [number, number][] {
+  const out: [number, number][] = [];
+  let t = 0;
+  for (let i = 0; i + 1 < flat.length; i += 2) {
+    t += flat[i];
+    out.push([t * 100, flat[i + 1]]);
+  }
+  return out;
+}
+
+export const fastestRuns = (runs: GhostRun[]) => [...runs].sort((a, b) => a.ms - b.ms).slice(0, MAX_GHOST_RUNS);
+
+export const encodeGhost = (puzzle: Puzzle, runs: GhostRun[]) =>
+  pack({ p: toCompact(puzzle), r: fastestRuns(runs).map((r) => [r.name.slice(0, 20), Math.round(r.ms), packSteps(r.steps)]) });
+
+export async function decodeGhost(code: string): Promise<{ puzzle: Puzzle; runs: GhostRun[] } | null> {
+  try {
+    const x = (await unpack(code)) as { p: Compact; r: [string, number, number[]][] };
+    const puzzle = fromCompact(x.p);
+    if (!isPuzzle(puzzle) || !Array.isArray(x.r)) return null;
+    const runs = x.r
+      .filter((r) => Array.isArray(r) && typeof r[1] === 'number' && Array.isArray(r[2]))
+      .map(([name, ms, steps]) => ({ name: String(name).slice(0, 20) || 'Someone', ms, steps: unpackSteps(steps) }));
+    return runs.length ? { puzzle, runs } : null;
+  } catch {
+    return null;
+  }
+}
+
+export const ghostUrl = async (puzzle: Puzzle, runs: GhostRun[]) =>
+  `${location.origin}${location.pathname}#/g/${await encodeGhost(puzzle, runs)}`;
+
+/** Pieces a ghost had on the board `ms` into its run. */
+export function ghostPlaced(run: GhostRun, ms: number): number {
+  let placed = 0;
+  for (const [t, count] of run.steps) {
+    if (t > ms) break;
+    placed = count;
+  }
+  return placed;
 }
 
 export const shareUrl = async (p: Puzzle) => `${location.origin}${location.pathname}#/p/${await encodeShare(p)}`;

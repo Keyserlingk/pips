@@ -76,6 +76,9 @@ export function Home({ go }: { go: (hash: string) => void }) {
           <button className="btn" onClick={() => go('#/duel')}>
             ⚔ Duel a friend
           </button>
+          <button className="btn ghost" onClick={() => go('#/ghost')}>
+            👻 Ghost challenge
+          </button>
         </div>
         <label className="check extras-toggle">
           <input type="checkbox" checked={withExtras} onChange={(e) => setWithExtras(e.target.checked)} />

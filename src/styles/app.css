@@ -239,3 +239,15 @@ label.radio span { display: block; }
   .reaction { animation: fade-out 2.6s ease forwards; }
   @keyframes fade-out { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 }
+
+/* Ghost races */
+.ghost-bars { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.ghost-bar .duel-progress > div { background: var(--muted); opacity: 0.7; }
+.ghost-bar.finished .duel-progress > div { background: var(--bad); opacity: 1; }
+.ghost-link { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.ghost-link input { font-size: 0.8rem; color: var(--muted); }
+.ghost-board { margin: 0; padding-left: 22px; }
+.ghost-board li { padding: 4px 0; }
+.ghost-board li > span { display: inline-block; min-width: 60%; }
+.ghost-board li.mine { font-weight: 800; color: var(--accent); }
+.duel-start h4 { margin: 4px 0 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
