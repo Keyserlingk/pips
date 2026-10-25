@@ -2,28 +2,39 @@ import { useEffect, useRef, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
 import { DEFAULT_OPTIONS } from '../../model/types';
 import { loadName, saveName } from '../../model/storage';
-import { type GhostRun, decodeGhost, fastestRuns, ghostPlaced, ghostUrl } from '../../model/serialize';
+import { type GhostRun, type GhostSeries, decodeGhost, fastestRuns, ghostPlaced, ghostUrl } from '../../model/serialize';
+import {
+  type LevelPlan,
+  PLAN_LABEL,
+  SCORING_LABEL,
+  type Scoring,
+  type SeriesRun,
+  gameGhosts,
+  levelsFor,
+  standings,
+} from '../../model/series';
 import { newId } from '../../model/cells';
+import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
 import { runEngine } from '../../engine/client';
 import { randomSeed } from '../../engine/rng';
 import { Play } from '../play/Play';
 import { formatMs } from '../format';
 
 /*
- * Ghost races: play a puzzle (no Reveal) while the number of pieces on the
- * board is recorded over time, then send a link. Whoever opens it races the
- * recorded "ghosts" on the same puzzle and can pass the link on with their own
- * run added. Links never contain the solution, only times and piece counts.
+ * Ghost races: play one or more puzzles in a row (no Reveal) while the number
+ * of pieces on the board is recorded over time, then send a link. Whoever
+ * opens it plays the same puzzles against the recorded "ghosts" and can pass
+ * the link on with their own run added. The winner is whoever won the most
+ * games or had the shortest total time, as the challenger chose. Links never
+ * contain solutions, only names, times and piece counts.
  */
 
-const LEVELS: Difficulty[] = ['easy', 'medium', 'hard', 'expert', 'rachel'];
 const COUNTDOWN_MS = 3000;
 /** Ghost bars shown during a race (the fastest runs). */
 const GHOSTS_SHOWN = 3;
+const GAME_COUNTS = [1, 2, 3, 4, 5, 7];
 
-const levelName = (d: Difficulty) => d[0].toUpperCase() + d.slice(1);
-
-// ----------------------------------------------------------------- the race
+// ----------------------------------------------------------------- one game
 
 /** Countdown, then the puzzle with ghost bars; records this run's progress. */
 function Race({
@@ -51,7 +62,7 @@ function Race({
   }, [done]);
 
   const giveUp = () => {
-    if (confirm('Give up this race?')) onDone(null);
+    if (confirm('Give up this game?')) onDone(null);
   };
 
   const elapsed = now - startAt;
@@ -98,12 +109,78 @@ function Race({
       {!done && (
         <div className="row center">
           <button className="btn ghost" onClick={giveUp}>
-            Give up
+            Give up this game
           </button>
         </div>
       )}
     </>
   );
+}
+
+// -------------------------------------------------------------- a series
+
+/**
+ * Plays the games one after another, with a short summary in between.
+ * `puzzles` may still be filling in (later games are generated in the
+ * background); a game that isn't ready yet shows a spinner.
+ */
+function SeriesRace({
+  puzzles,
+  runs,
+  name,
+  onComplete,
+}: {
+  puzzles: (Puzzle | null)[];
+  runs: SeriesRun[];
+  name: string;
+  onComplete: (run: SeriesRun) => void;
+}) {
+  const [game, setGame] = useState(0);
+  const [between, setBetween] = useState(false);
+  const [mine, setMine] = useState<SeriesRun>({ name, times: [], steps: [] });
+  const count = puzzles.length;
+  const puzzle = puzzles[game];
+
+  const finishGame = (r: GhostRun | null) => {
+    const next: SeriesRun = { name, times: [...mine.times, r ? r.ms : null], steps: [...mine.steps, r ? r.steps : []] };
+    setMine(next);
+    if (game + 1 >= count) onComplete(next);
+    else setBetween(true);
+  };
+
+  if (between) {
+    const done = game;
+    return (
+      <div className="duel-start">
+        <section className="panel">
+          <h2>
+            Game {done + 1} of {count}: {mine.times[done] === null ? 'gave up' : formatMs(mine.times[done]!)}
+          </h2>
+          <GameTimes runs={runs} mine={mine} game={done} />
+          <div className="row">
+            <button
+              className="btn"
+              onClick={() => {
+                setGame(done + 1);
+                setBetween(false);
+              }}
+            >
+              Next game
+            </button>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  if (!puzzle)
+    return (
+      <section className="panel center">
+        <span className="spinner" /> Preparing game {game + 1} of {count}…
+      </section>
+    );
+
+  return <Race key={game} puzzle={puzzle} ghosts={gameGhosts(runs, game)} name={name} onDone={finishGame} />;
 }
 
 // ---------------------------------------------------------------- helpers
@@ -142,111 +219,244 @@ function LinkBox({ url, title }: { url: string; title: string }) {
   );
 }
 
-function Leaderboard({ runs, mine }: { runs: GhostRun[]; mine?: GhostRun | null }) {
-  const all = [...runs, ...(mine ? [mine] : [])].sort((a, b) => a.ms - b.ms);
+const timeOf = (t: number | null | undefined) => (t == null ? 'gave up' : formatMs(t));
+
+/** Everyone's time in one game, fastest first. */
+function GameTimes({ runs, mine, game }: { runs: SeriesRun[]; mine: SeriesRun; game: number }) {
+  const rows = [...runs, mine].sort((a, b) => (a.times[game] ?? Infinity) - (b.times[game] ?? Infinity));
   return (
     <ol className="ghost-board">
-      {all.map((r, i) => (
+      {rows.map((r, i) => (
         <li key={i} className={r === mine ? 'mine' : ''}>
           <span>{r === mine ? `${r.name} (you)` : r.name}</span>
-          <strong>{formatMs(r.ms)}</strong>
+          <strong>{timeOf(r.times[game])}</strong>
         </li>
       ))}
     </ol>
   );
 }
 
+/** Series standings: games won and total time, ranked by the series' rule. */
+function Standings({ runs, scoring, mine }: { runs: SeriesRun[]; scoring: Scoring; mine?: SeriesRun | null }) {
+  const games = Math.max(...[...runs, ...(mine ? [mine] : [])].map((r) => r.times.length));
+  const rows = standings([...runs, ...(mine ? [mine] : [])], scoring);
+  return (
+    <table className="ghost-standings">
+      <thead>
+        <tr>
+          <th />
+          <th>Player</th>
+          {games > 1 && <th className={scoring === 'wins' ? 'key' : ''}>Won</th>}
+          <th className={scoring === 'time' || games === 1 ? 'key' : ''}>{games > 1 ? 'Total' : 'Time'}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((s, i) => (
+          <tr key={i} className={s.run === mine ? 'mine' : ''}>
+            <td>{i + 1}.</td>
+            <td>{s.run === mine ? `${s.run.name} (you)` : s.run.name}</td>
+            {games > 1 && <td>{s.wins}</td>}
+            <td>{s.total === null ? (games > 1 ? '—' : 'gave up') : formatMs(s.total)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+const LevelPill = ({ d }: { d: Difficulty }) => <span className={`pill ${levelClass(d)}`}>{levelLabel(d)}</span>;
+
 // -------------------------------------------------------- #/ghost: make one
 
 export function GhostStart({ go }: { go: (hash: string) => void }) {
   const [name, setName] = useState(() => loadName());
-  const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-  const [phase, setPhase] = useState<'setup' | 'making' | 'racing' | 'done'>('setup');
-  const [puzzle, setPuzzle] = useState<Puzzle | null>(null);
-  const [run, setRun] = useState<GhostRun | null>(null);
+  const [games, setGames] = useState(1);
+  const [plan, setPlan] = useState<LevelPlan>('same');
+  const [level, setLevel] = useState<Difficulty>('medium');
+  const [scoring, setScoring] = useState<Scoring>('wins');
+  const [phase, setPhase] = useState<'setup' | 'playing' | 'done'>('setup');
+  const [puzzles, setPuzzles] = useState<(Puzzle | null)[]>([]);
+  const [run, setRun] = useState<SeriesRun | null>(null);
   const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const alive = useRef(true);
   const player = name.trim() || 'Player';
+  // A single game has nothing to tally: its time decides.
+  const rule: Scoring = games > 1 ? scoring : 'time';
 
-  const start = async () => {
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+    };
+  }, []);
+
+  const start = () => {
     saveName(name.trim());
-    setPhase('making');
     setError(null);
-    const maxPip = difficulty === 'rachel' ? 9 : 6;
-    try {
-      const q = await runEngine('quick', { ...DEFAULT_OPTIONS, maxPip, difficulty, seed: randomSeed() }).promise;
-      if (!q.ok) throw new Error(q.error);
-      setPuzzle({
-        version: 1,
-        id: `ghost-${newId()}`,
-        title: `${player}'s challenge`,
-        difficulty: q.stats.rating,
-        width: q.width,
-        height: q.height,
-        cells: q.cells,
-        regions: q.regions,
-        dominoes: q.dominoes,
-        options: { ...DEFAULT_OPTIONS, maxPip },
-      });
-      setPhase('racing');
-    } catch (e) {
-      setError((e as Error).message);
-      setPhase('setup');
-    }
+    const levels = levelsFor(plan, level, games);
+    setPuzzles(levels.map(() => null));
+    setPhase('playing');
+    // Generate the games in order, in the background: game 1 is ready first,
+    // the rest are made while you play.
+    (async () => {
+      for (const [i, difficulty] of levels.entries()) {
+        try {
+          const q = await runEngine('quick', { ...DEFAULT_OPTIONS, maxPip: 6, difficulty, seed: randomSeed() }).promise;
+          if (!q.ok) throw new Error(q.error);
+          if (!alive.current) return;
+          const puzzle: Puzzle = {
+            version: 1,
+            id: `ghost-${newId()}`,
+            title: games > 1 ? `Game ${i + 1} of ${games}` : `${player}'s challenge`,
+            difficulty: q.stats.rating,
+            width: q.width,
+            height: q.height,
+            cells: q.cells,
+            regions: q.regions,
+            dominoes: q.dominoes,
+            options: { ...DEFAULT_OPTIONS, maxPip: 6 },
+          };
+          setPuzzles((ps) => ps.map((p, j) => (j === i ? puzzle : p)));
+        } catch (e) {
+          if (!alive.current) return;
+          setError((e as Error).message);
+          setPhase('setup');
+          return;
+        }
+      }
+    })();
   };
 
-  const finish = async (r: GhostRun | null) => {
+  const complete = async (r: SeriesRun) => {
     setRun(r);
     setPhase('done');
-    if (r && puzzle) setUrl(await ghostUrl(puzzle, [r]));
+    const ready = puzzles.filter((p): p is Puzzle => !!p);
+    if (r.times.some((t) => t !== null) && ready.length === puzzles.length)
+      setUrl(await ghostUrl({ puzzles: ready, scoring: rule, runs: [r] }));
   };
 
-  if (phase === 'racing' && puzzle) return <Race puzzle={puzzle} ghosts={[]} name={player} onDone={finish} />;
+  if (phase === 'playing') return <SeriesRace puzzles={puzzles} runs={[]} name={player} onComplete={complete} />;
+
+  const total = run && run.times.every((t) => t !== null) ? run.times.reduce<number>((a, t) => a + (t ?? 0), 0) : null;
 
   return (
     <div className="duel-start">
       <section className="panel">
-        {phase === 'done' ? (
-          run ? (
-            <>
-              <h2>Solved in {formatMs(run.ms)}</h2>
-              <p className="muted">Send this to a friend: they race your ghost on the same puzzle.</p>
-              {url && <LinkBox url={url} title={`Beat my ${formatMs(run.ms)} in Pips`} />}
-            </>
-          ) : (
-            <h2>You gave up</h2>
-          )
+        {phase === 'done' && run ? (
+          <>
+            <h2>
+              {run.times.length > 1
+                ? total !== null
+                  ? `All ${run.times.length} games in ${formatMs(total)}`
+                  : 'Series done'
+                : run.times[0] !== null
+                  ? `Solved in ${formatMs(run.times[0])}`
+                  : 'You gave up'}
+            </h2>
+            {run.times.length > 1 && (
+              <ol className="ghost-board">
+                {run.times.map((t, i) => (
+                  <li key={i}>
+                    <span>
+                      Game {i + 1} {puzzles[i]?.difficulty && <LevelPill d={puzzles[i]!.difficulty!} />}
+                    </span>
+                    <strong>{timeOf(t)}</strong>
+                  </li>
+                ))}
+              </ol>
+            )}
+            {url ? (
+              <>
+                <p className="muted">Send this to a friend: they race your ghost on the same puzzles.</p>
+                <LinkBox url={url} title={`Beat me in Pips (${SCORING_LABEL[rule].toLowerCase()})`} />
+              </>
+            ) : (
+              <p className="muted">You gave up every game, so there's no ghost to race.</p>
+            )}
+          </>
         ) : (
           <>
             <h2>👻 Ghost challenge</h2>
             <p className="muted">
-              Solve a puzzle against the clock (no Reveal). Then send it to a friend: they race your recorded ghost,
-              and can pass it on with their own time.
+              Play against the clock (no Reveal). Then send it to a friend: they race your recorded ghost on the same
+              puzzles, and can pass it on with their own times.
             </p>
             <NameField name={name} setName={setName} />
-            <label>
-              Level
-              <select value={difficulty} onChange={(e) => setDifficulty(e.target.value as Difficulty)}>
-                {LEVELS.map((d) => (
-                  <option key={d} value={d}>
-                    {levelName(d)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="row">
+              <label>
+                Games
+                <select value={games} onChange={(e) => setGames(+e.target.value)}>
+                  {GAME_COUNTS.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {games > 1 && (
+                <label>
+                  Levels
+                  <select value={plan} onChange={(e) => setPlan(e.target.value as LevelPlan)}>
+                    {(Object.keys(PLAN_LABEL) as LevelPlan[]).map((p) => (
+                      <option key={p} value={p}>
+                        {PLAN_LABEL[p]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {!(games > 1 && plan === 'mixed') && (
+                <label>
+                  {games > 1 && plan === 'increasing' ? 'Start at' : 'Level'}
+                  <select value={level} onChange={(e) => setLevel(e.target.value as Difficulty)}>
+                    {PLAYABLE_LEVELS.map((d) => (
+                      <option key={d} value={d}>
+                        {levelLabel(d)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+            {games > 1 && (
+              <label>
+                Winner
+                <select value={scoring} onChange={(e) => setScoring(e.target.value as Scoring)}>
+                  {(Object.keys(SCORING_LABEL) as Scoring[]).map((s) => (
+                    <option key={s} value={s}>
+                      {SCORING_LABEL[s]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            {games > 1 && plan !== 'mixed' && (
+              <p className="muted small">
+                Games:{' '}
+                {levelsFor(plan, level, games)
+                  .map(levelLabel)
+                  .join(' → ')}
+              </p>
+            )}
             {error && <p className="error small">Could not make a puzzle: {error}</p>}
           </>
         )}
         <div className="row">
-          {phase === 'making' ? (
-            <span className="muted">
-              <span className="spinner" /> Preparing a puzzle…
-            </span>
-          ) : (
-            <button className="btn" onClick={phase === 'done' ? () => setPhase('setup') : start}>
-              {phase === 'done' ? 'Make another' : 'Start'}
-            </button>
-          )}
+          <button
+            className="btn"
+            onClick={
+              phase === 'done'
+                ? () => {
+                    setPhase('setup');
+                    setRun(null);
+                    setUrl('');
+                  }
+                : start
+            }
+          >
+            {phase === 'done' ? 'Make another' : 'Start'}
+          </button>
           <button className="btn ghost" onClick={() => go('#/')}>
             Home
           </button>
@@ -259,10 +469,10 @@ export function GhostStart({ go }: { go: (hash: string) => void }) {
 // ------------------------------------------------ #/g/<code>: race a ghost
 
 export function GhostChallenge({ code, go }: { code: string; go: (hash: string) => void }) {
-  const [data, setData] = useState<{ puzzle: Puzzle; runs: GhostRun[] } | null | undefined>(undefined);
+  const [data, setData] = useState<GhostSeries | null | undefined>(undefined);
   const [name, setName] = useState(() => loadName());
-  const [phase, setPhase] = useState<'intro' | 'racing' | 'done'>('intro');
-  const [mine, setMine] = useState<GhostRun | null>(null);
+  const [phase, setPhase] = useState<'intro' | 'playing' | 'done'>('intro');
+  const [mine, setMine] = useState<SeriesRun | null>(null);
   const [url, setUrl] = useState('');
   const player = name.trim() || 'Player';
 
@@ -285,49 +495,57 @@ export function GhostChallenge({ code, go }: { code: string; go: (hash: string) 
       </section>
     );
 
-  const { puzzle, runs } = data;
-  const best = fastestRuns(runs)[0];
+  const { puzzles, runs, scoring } = data;
+  const count = puzzles.length;
+  const leader = standings(runs, scoring)[0].run;
 
-  const finish = async (r: GhostRun | null) => {
+  const complete = async (r: SeriesRun) => {
     setMine(r);
     setPhase('done');
-    if (r) setUrl(await ghostUrl(puzzle, [...runs, r]));
+    if (r.times.some((t) => t !== null)) setUrl(await ghostUrl({ puzzles, scoring, runs: [...runs, r] }));
   };
 
-  if (phase === 'racing') return <Race puzzle={puzzle} ghosts={runs} name={player} onDone={finish} />;
+  if (phase === 'playing') return <SeriesRace puzzles={puzzles} runs={runs} name={player} onComplete={complete} />;
 
-  const verdict = mine
-    ? mine.ms < best.ms
-      ? `You beat ${best.name} by ${formatMs(best.ms - mine.ms)}!`
-      : `${best.name} was faster by ${formatMs(mine.ms - best.ms)}.`
-    : null;
+  let verdict: string | null = null;
+  if (mine) {
+    const final = standings([...runs, mine], scoring);
+    const winner = final[0];
+    const iWon = winner.run === mine;
+    if (count === 1 && mine.times[0] !== null) {
+      const best = Math.min(...runs.map((r) => r.times[0] ?? Infinity));
+      const bestName = runs.find((r) => r.times[0] === best)?.name ?? leader.name;
+      verdict =
+        mine.times[0] < best
+          ? `You beat ${bestName} by ${formatMs(best - mine.times[0])}!`
+          : `${bestName} was faster by ${formatMs(mine.times[0] - best)}.`;
+    } else verdict = iWon ? 'You won the series!' : `${winner.run.name} wins the series.`;
+  }
 
   return (
     <div className="duel-start">
       <section className="panel">
         {phase === 'intro' ? (
           <>
-            <h2>
-              👻 {best.name} challenges you
-              {puzzle.difficulty && <span className={`pill ${puzzle.difficulty}`}>{puzzle.difficulty}</span>}
-            </h2>
-            <p className="muted">
-              Race their ghost on the same {puzzle.cells.length}-cell puzzle. It appears when the countdown ends; no
-              Reveal.
+            <h2>👻 {leader.name} challenges you</h2>
+            <p className="ghost-summary">
+              {count === 1 ? '1 puzzle' : `${count} games`}{' '}
+              {puzzles.map((p, i) => p.difficulty && <LevelPill key={i} d={p.difficulty} />)}
+              {count > 1 && <span className="muted small"> · Winner: {SCORING_LABEL[scoring].toLowerCase()}</span>}
             </p>
-            <h4>Times to beat</h4>
-            <Leaderboard runs={runs} />
+            <p className="muted small">Each puzzle appears when its countdown ends. No Reveal.</p>
+            <h4>To beat</h4>
+            <Standings runs={runs} scoring={scoring} />
             <NameField name={name} setName={setName} />
           </>
         ) : (
           <>
-            <h2>{mine ? `Solved in ${formatMs(mine.ms)}` : 'You gave up'}</h2>
-            {verdict && <p>{verdict}</p>}
-            <Leaderboard runs={runs} mine={mine} />
+            <h2>{verdict}</h2>
+            <Standings runs={runs} scoring={scoring} mine={mine} />
             {mine && url && (
               <>
-                <p className="muted">Pass it on: the next player races the fastest ghosts, including yours.</p>
-                <LinkBox url={url} title={`Beat my ${formatMs(mine.ms)} in Pips`} />
+                <p className="muted">Pass it on: the next player races everyone's ghosts, including yours.</p>
+                <LinkBox url={url} title="Beat me in Pips" />
               </>
             )}
           </>
@@ -338,7 +556,7 @@ export function GhostChallenge({ code, go }: { code: string; go: (hash: string) 
               className="btn"
               onClick={() => {
                 saveName(name.trim());
-                setPhase('racing');
+                setPhase('playing');
               }}
             >
               Start

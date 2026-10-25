@@ -8,6 +8,10 @@ import { Play } from './ui/play/Play';
 import { Editor } from './ui/editor/Editor';
 import { Duel, DuelStart } from './ui/duel/Duel';
 import { GhostChallenge, GhostStart } from './ui/ghost/Ghost';
+import { DailyHome, DailyPlay } from './ui/daily/Daily';
+import { isDateKey } from './model/daily';
+import { PLAYABLE_LEVELS } from './model/levels';
+import type { Difficulty } from './model/types';
 import { normaliseCode } from './duel/protocol';
 
 function useHash() {
@@ -56,6 +60,14 @@ export function App() {
     if (parts[1] === 'quick') page = play(loadQuick(), 'quick');
     else if (parts[1] === 'local') page = play(getPuzzle(parts[2]), 'local');
     else page = play(parts[1] === 's' ? decodeLegacy(parts[2] ?? '') : null, 'shared');
+  } else if (parts[0] === 'daily') {
+    const level = parts[2] as Difficulty;
+    page =
+      parts[1] && isDateKey(parts[1]) && PLAYABLE_LEVELS.includes(level) ? (
+        <DailyPlay key={hash} date={parts[1]} level={level} go={go} />
+      ) : (
+        <DailyHome go={go} />
+      );
   } else if (parts[0] === 'ghost') {
     page = <GhostStart go={go} />;
   } else if (parts[0] === 'g' && parts[1]) {

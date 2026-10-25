@@ -4,6 +4,7 @@ import { DIRS, add, constraintRule, evaluate, key, newId, ruleKey, sameCell } fr
 import { type Orient, type PlayState, type Snapshot, getPuzzle, loadProgress, savePuzzle, saveProgress } from '../../model/storage';
 import { samePuzzle, shareUrl } from '../../model/serialize';
 import { runEngine } from '../../engine/client';
+import { levelClass, levelLabel } from '../../model/levels';
 import { Board, type BoardDomino, cellAt, cellPixels } from '../board/Board';
 import { DominoShape, S } from '../board/DominoShape';
 
@@ -56,8 +57,8 @@ export function Play({
   race,
 }: {
   puzzle: Puzzle;
-  /** Where the puzzle came from: the library, a random puzzle, or a share link. */
-  source: 'local' | 'quick' | 'shared';
+  /** Where the puzzle came from: the library, a random puzzle, a share link, or the daily set. */
+  source: 'local' | 'quick' | 'shared' | 'daily';
   onHome: () => void;
   onEdit?: () => void;
   onRemix?: () => void;
@@ -322,7 +323,7 @@ export function Play({
         )}
         <div className="play-title">
           <strong>{puzzle.title || 'Untitled'}</strong>
-          {puzzle.difficulty && <span className={`pill ${puzzle.difficulty}`}>{puzzle.difficulty}</span>}
+          {puzzle.difficulty && <span className={`pill ${levelClass(puzzle.difficulty)}`}>{levelLabel(puzzle.difficulty)}</span>}
         </div>
         <span className="timer">{formatTime(st.elapsed)}</span>
       </div>

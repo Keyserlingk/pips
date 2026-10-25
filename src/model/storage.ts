@@ -64,6 +64,22 @@ export interface Snapshot {
 export const loadProgress = (id: string) => read<PlayState>(PROGRESS + id);
 export const saveProgress = (id: string, s: PlayState | null) => write(PROGRESS + id, s);
 
+// Daily puzzles, cached per device so each is generated once.
+const DAILY = 'pips.daily.';
+const DAILY_KEEP_DAYS = 14;
+export const loadDaily = (date: string, level: string) => read<Puzzle>(`${DAILY}${date}.${level}`);
+export function saveDaily(date: string, level: string, p: Puzzle) {
+  write(`${DAILY}${date}.${level}`, p);
+  try {
+    // Forget cached daily puzzles older than two weeks.
+    const cutoff = new Date(Date.now() - DAILY_KEEP_DAYS * 86_400_000).toISOString().slice(0, 10);
+    for (const k of Object.keys(localStorage))
+      if (k.startsWith(DAILY) && k.slice(DAILY.length, DAILY.length + 10) < cutoff) localStorage.removeItem(k);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 /** The name shown to duel opponents. */
 export const loadName = () => read<string>('pips.name') ?? '';
 export const saveName = (name: string) => write('pips.name', name);

@@ -1,4 +1,5 @@
 import type { Constraint, Difficulty, ExtraKind, Puzzle } from './types';
+import { type Scoring, type SeriesRun, standings } from './series';
 
 /*
  * Share links: #/p/<code>. The code is a compact JSON form of the puzzle,
@@ -115,9 +116,9 @@ export interface GhostRun {
   steps: [number, number][];
 }
 
-/** Runs carried by a link (the fastest are kept) and recorded steps per run. */
+/** Players carried by a link (the best are kept) and recorded steps per game. */
 export const MAX_GHOST_RUNS = 5;
-const MAX_STEPS = 300;
+const MAX_STEPS = 120;
 
 /** Steps are stored as tenths of a second since the previous step, then the count. */
 function packSteps(steps: [number, number][]): number[] {
@@ -146,25 +147,59 @@ function unpackSteps(flat: number[]): [number, number][] {
 
 export const fastestRuns = (runs: GhostRun[]) => [...runs].sort((a, b) => a.ms - b.ms).slice(0, MAX_GHOST_RUNS);
 
-export const encodeGhost = (puzzle: Puzzle, runs: GhostRun[]) =>
-  pack({ p: toCompact(puzzle), r: fastestRuns(runs).map((r) => [r.name.slice(0, 20), Math.round(r.ms), packSteps(r.steps)]) });
+/** A ghost challenge: the puzzles, how the winner is decided, and everyone's runs. */
+export interface GhostSeries {
+  puzzles: Puzzle[];
+  scoring: Scoring;
+  runs: SeriesRun[];
+}
 
-export async function decodeGhost(code: string): Promise<{ puzzle: Puzzle; runs: GhostRun[] } | null> {
+/** Keeps the best MAX_GHOST_RUNS players by the series' own scoring. */
+export const encodeGhost = (series: GhostSeries) =>
+  pack({
+    v: 2,
+    s: series.scoring,
+    g: series.puzzles.map(toCompact),
+    r: standings(series.runs, series.scoring)
+      .slice(0, MAX_GHOST_RUNS)
+      .map(({ run }) => [run.name.slice(0, 20), run.times.map((t) => (t === null ? -1 : Math.round(t))), run.steps.map(packSteps)]),
+  });
+
+export async function decodeGhost(code: string): Promise<GhostSeries | null> {
   try {
-    const x = (await unpack(code)) as { p: Compact; r: [string, number, number[]][] };
-    const puzzle = fromCompact(x.p);
-    if (!isPuzzle(puzzle) || !Array.isArray(x.r)) return null;
-    const runs = x.r
-      .filter((r) => Array.isArray(r) && typeof r[1] === 'number' && Array.isArray(r[2]))
-      .map(([name, ms, steps]) => ({ name: String(name).slice(0, 20) || 'Someone', ms, steps: unpackSteps(steps) }));
-    return runs.length ? { puzzle, runs } : null;
+    const x = (await unpack(code)) as
+      | { v: 2; s: Scoring; g: Compact[]; r: [string, number[], number[][]][] }
+      | { p: Compact; r: [string, number, number[]][] };
+    let series: GhostSeries;
+    if ('p' in x) {
+      // First version: a single puzzle.
+      series = {
+        puzzles: [fromCompact(x.p)],
+        scoring: 'time',
+        runs: x.r.map(([name, ms, steps]) => ({ name, times: [ms], steps: [unpackSteps(steps)] })),
+      };
+    } else {
+      series = {
+        puzzles: x.g.map(fromCompact),
+        scoring: x.s === 'wins' ? 'wins' : 'time',
+        runs: x.r.map(([name, times, steps]) => ({
+          name,
+          times: times.map((t) => (t < 0 ? null : t)),
+          steps: steps.map(unpackSteps),
+        })),
+      };
+    }
+    series.runs = series.runs
+      .filter((r) => r.times.length === series.puzzles.length)
+      .map((r) => ({ ...r, name: String(r.name).slice(0, 20) || 'Someone' }));
+    const ok = series.puzzles.length > 0 && series.puzzles.every(isPuzzle) && series.runs.length > 0;
+    return ok ? series : null;
   } catch {
     return null;
   }
 }
 
-export const ghostUrl = async (puzzle: Puzzle, runs: GhostRun[]) =>
-  `${location.origin}${location.pathname}#/g/${await encodeGhost(puzzle, runs)}`;
+export const ghostUrl = async (series: GhostSeries) => `${location.origin}${location.pathname}#/g/${await encodeGhost(series)}`;
 
 /** Pieces a ghost had on the board `ms` into its run. */
 export function ghostPlaced(run: GhostRun, ms: number): number {

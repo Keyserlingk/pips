@@ -15,6 +15,13 @@ export type GenMode = 'auto' | 'regions' | 'manual';
 
 export interface GenOptions extends PuzzleOptions {
   mode: GenMode;
+  /** Upper bound on generation attempts (otherwise: until the time budget runs out). */
+  maxAttempts?: number;
+  /**
+   * Same seed, same puzzle on every device: no time limits, only fixed amounts
+   * of work. Used for daily puzzles (slower on slow devices, but identical).
+   */
+  deterministic?: boolean;
   difficulty: Difficulty;
   seed?: number;
 }
@@ -654,7 +661,7 @@ export function generate(layout: Layout, opts: GenOptions, deadline = Date.now()
   const cells = layout.cells.map((c) => toIdx(c, W));
   const target = DIFFICULTIES.indexOf(opts.difficulty);
   // Keep trying until the deadline when aiming for a grade; harder grades are rarer.
-  const maxAttempts = opts.mode === 'auto' ? 200 : 6;
+  const maxAttempts = opts.maxAttempts ?? (opts.mode === 'auto' ? 200 : 6);
   let best: { result: GenResult & { ok: true }; score: number } | null = null;
   // Past this point with nothing usable, expert generation stops being picky.
   const late = Date.now() + (deadline - Date.now()) * 0.6;
@@ -719,7 +726,8 @@ export function generate(layout: Layout, opts: GenOptions, deadline = Date.now()
     const score = Math.abs(got - target) + (got < target ? 0.5 : 0) + (stats.aborted ? 1 : 0) + penalty;
     if (!best || score < best.score) best = { result, score };
     const goodEnough = isTop(opts.difficulty) && got === target && singles <= 0.3 && (!rachel || entries <= 3);
-    if (opts.mode !== 'auto' || score === 0 || goodEnough) break;
+    // Without a deadline (deterministic mode) there's no time to fill: take the first match.
+    if (opts.mode !== 'auto' || score === 0 || goodEnough || (opts.deterministic && got === target)) break;
   }
 
   if (best) return best.result;
@@ -799,6 +807,9 @@ export function verify(layout: Layout, dominoes: Domino[], maxPip: number): GenR
   };
 }
 
+/** Attempts per board in deterministic mode (instead of a time budget). */
+const FIXED_ATTEMPTS: Record<Difficulty, number> = { easy: 12, medium: 16, hard: 30, expert: 40, rachel: 40 };
+
 const QUICK_SIZE: Record<Difficulty, [number, number]> = {
   easy: [8, 12],
   medium: [12, 18],
@@ -821,13 +832,20 @@ export function quickPuzzle(opts: Omit<GenOptions, 'mode'>) {
       : opts.difficulty === 'expert'
         ? [['expert', 0.7], ['hard', 0.9], ['medium', 1]]
         : [[opts.difficulty, 0.8], ['medium', 1]];
+  // Deterministic mode never looks at the clock: no deadline, a fixed number of attempts.
+  const fixed = !!opts.deterministic;
   for (const [difficulty, share] of plan) {
     const [lo, hi] = QUICK_SIZE[difficulty];
     const n = randInt(rng, lo / 2, hi / 2) * 2;
-    const deadline = start + budget * share;
+    const deadline = fixed ? Infinity : start + budget * share;
+    const maxAttempts = fixed ? FIXED_ATTEMPTS[difficulty] : undefined;
     for (let i = 0; i < 5 && (i === 0 || Date.now() < deadline); i++) {
       const shape = randomShape(8, 8, n, rng);
-      const res = generate({ ...shape, regions: [] }, { ...opts, difficulty, mode: 'auto', seed: (rng() * 2 ** 32) >>> 0 }, deadline);
+      const res = generate(
+        { ...shape, regions: [] },
+        { ...opts, difficulty, mode: 'auto', maxAttempts, seed: (rng() * 2 ** 32) >>> 0 },
+        deadline,
+      );
       if (res.ok) return { ...shape, ...res };
     }
   }
@@ -835,7 +853,11 @@ export function quickPuzzle(opts: Omit<GenOptions, 'mode'>) {
   // which takes milliseconds, so the button never comes back empty.
   for (let i = 0; i < 5; i++) {
     const shape = randomShape(8, 8, 10, rng);
-    const res = generate({ ...shape, regions: [] }, { ...opts, difficulty: 'easy', mode: 'auto', seed: (rng() * 2 ** 32) >>> 0 }, Infinity);
+    const res = generate(
+      { ...shape, regions: [] },
+      { ...opts, difficulty: 'easy', mode: 'auto', maxAttempts: fixed ? FIXED_ATTEMPTS.easy : undefined, seed: (rng() * 2 ** 32) >>> 0 },
+      Infinity,
+    );
     if (res.ok) return { ...shape, ...res };
   }
   return { ok: false as const, error: 'Could not generate a puzzle, please try again.' };

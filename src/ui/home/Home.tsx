@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
 import { DEFAULT_OPTIONS, EXTRA_KINDS } from '../../model/types';
+import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
+import { solvedToday } from '../daily/Daily';
 import { deletePuzzle, loadLibrary, saveProgress, savePuzzle, saveQuick } from '../../model/storage';
 import { isPuzzle, shareUrl } from '../../model/serialize';
 import { newId } from '../../model/cells';
@@ -8,7 +10,7 @@ import { runEngine } from '../../engine/client';
 import { randomSeed } from '../../engine/rng';
 
 /** Shown while the slower levels generate. */
-const WAIT: Partial<Record<Difficulty, string>> = { expert: ' (up to 10 s)', rachel: ' (up to 15 s)' };
+const WAIT: Partial<Record<Difficulty, string>> = { expert: ' (up to 10 s)' };
 
 export function Home({ go }: { go: (hash: string) => void }) {
   const [library, setLibrary] = useState<Puzzle[]>(loadLibrary);
@@ -21,15 +23,14 @@ export function Home({ go }: { go: (hash: string) => void }) {
   const quick = (difficulty: Difficulty) => {
     setBusy(difficulty);
     setError(null);
-    // Rachel uses the double-nine set: fewer give-away single cells than with 0–6.
-    const opts = { ...options, maxPip: difficulty === 'rachel' ? (9 as const) : (6 as const) };
+    const opts = { ...options, maxPip: 6 as const };
     runEngine('quick', { ...opts, difficulty, seed: randomSeed() })
       .promise.then((res) => {
         if (!res.ok) return setError(res.error);
         const p: Puzzle = {
           version: 1,
           id: `quick-${newId()}`,
-          title: `Random ${difficulty}`,
+          title: `Random ${levelLabel(difficulty)}`,
           difficulty,
           width: res.width,
           height: res.height,
@@ -64,11 +65,16 @@ export function Home({ go }: { go: (hash: string) => void }) {
       <section className="hero">
         <h1>Custom Pips</h1>
         <p className="muted">Place every domino so that each coloured region meets its condition.</p>
+        <div className="row center daily-entry">
+          <button className="btn daily-button" onClick={() => go('#/daily')}>
+            📅 Daily <span className="daily-count">{solvedToday()}/4 today</span>
+          </button>
+        </div>
         <div className="quick">
-          {(['easy', 'medium', 'hard', 'expert', 'rachel'] as Difficulty[]).map((d) => (
+          {PLAYABLE_LEVELS.map((d) => (
             <button key={d} className={`quick-card ${d}`} onClick={() => quick(d)} disabled={!!busy}>
-              <span className="quick-label">{d}</span>
-              <span className="muted small">{busy === d ? `Generating…${WAIT[d] ?? ''}` : d === 'rachel' ? 'Much harder' : 'Random puzzle'}</span>
+              <span className="quick-label">{levelLabel(d)}</span>
+              <span className="muted small">{busy === d ? `Generating…${WAIT[d] ?? ''}` : 'Random puzzle'}</span>
             </button>
           ))}
         </div>
@@ -118,7 +124,7 @@ export function Home({ go }: { go: (hash: string) => void }) {
                     {' '}
                     {p.cells.length} cells{p.author ? ` · by ${p.author}` : ''}
                   </span>
-                  {p.difficulty && <span className={`pill ${p.difficulty}`}>{p.difficulty}</span>}
+                  {p.difficulty && <span className={`pill ${levelClass(p.difficulty)}`}>{levelLabel(p.difficulty)}</span>}
                 </div>
                 <div className="row">
                   <button className="btn" onClick={() => go(`#/play/local/${p.id}`)}>

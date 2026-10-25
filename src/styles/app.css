@@ -63,12 +63,12 @@ label.radio span { display: block; }
 .pill.easy { background: var(--region-4-fill); color: var(--region-4-stroke); }
 .pill.medium { background: var(--region-2-fill); color: var(--region-2-stroke); }
 .pill.hard { background: var(--region-0-fill); color: var(--region-0-stroke); }
-.pill.expert { background: var(--region-3-stroke); color: var(--surface); }
+.pill.expert { background: var(--text); color: var(--bg); }
 .pill.rachel { background: var(--text); color: var(--bg); }
 
 /* Home */
 .hero { text-align: center; padding: 18px 0 28px; }
-.quick { display: grid; grid-template-columns: repeat(5, minmax(0, 160px)); gap: 14px; justify-content: center; margin-top: 22px; }
+.quick { display: grid; grid-template-columns: repeat(4, minmax(0, 170px)); gap: 14px; justify-content: center; margin-top: 22px; }
 .quick-card {
   border: 2px solid var(--border);
   border-radius: 18px;
@@ -81,7 +81,8 @@ label.radio span { display: block; }
 .quick-card.easy { background: var(--region-4-fill); border-color: var(--region-4-stroke); }
 .quick-card.medium { background: var(--region-2-fill); border-color: var(--region-2-stroke); }
 .quick-card.hard { background: var(--region-0-fill); border-color: var(--region-0-stroke); }
-.quick-card.expert { background: var(--region-3-fill); border-color: var(--region-3-stroke); }
+.quick-card.expert { background: var(--text); border-color: var(--text); color: var(--bg); }
+.quick-card.expert .muted { color: var(--bg); }
 /* The boss level: inverted colours. */
 .quick-card.rachel { background: var(--text); border-color: var(--text); color: var(--bg); }
 .quick-card.rachel .muted { color: var(--bg); }
@@ -145,7 +146,7 @@ label.radio span { display: block; }
 
 @media (max-width: 860px) {
   .editor-grid { grid-template-columns: minmax(0, 1fr); }
-  .quick { grid-template-columns: repeat(3, minmax(0, 180px)); }
+  .quick { grid-template-columns: repeat(2, minmax(0, 180px)); }
 }
 @media (max-width: 520px) {
   .quick { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -251,3 +252,19 @@ label.radio span { display: block; }
 .ghost-board li > span { display: inline-block; min-width: 60%; }
 .ghost-board li.mine { font-weight: 800; color: var(--accent); }
 .duel-start h4 { margin: 4px 0 0; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.ghost-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0; font-weight: 700; }
+.ghost-summary .pill { margin-left: 0; }
+.ghost-standings { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.ghost-standings th { text-align: left; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); padding: 4px 6px; }
+.ghost-standings th.key { color: var(--text); }
+.ghost-standings td { padding: 5px 6px; border-top: 1px solid var(--border); }
+.ghost-standings td:first-child { color: var(--muted); width: 2em; }
+.ghost-standings tr.mine td { font-weight: 800; color: var(--accent); }
+
+/* Daily puzzles */
+.daily-entry { margin-top: 18px; }
+.daily-button { font-size: 1.05rem; padding: 10px 22px; }
+.daily-count { margin-left: 8px; font-weight: 600; opacity: 0.75; font-size: 0.85rem; }
+.daily .quick { margin-top: 0; }
+.quick-card.solved { outline: 3px solid var(--ok); outline-offset: 2px; }
+.quick-card:disabled { cursor: progress; }

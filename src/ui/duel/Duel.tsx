@@ -10,8 +10,8 @@ import { type DuelMsg, EMOJIS, type Placed, PROTOCOL, isHost, normaliseCode, ran
 import { validFinish } from '../../duel/referee';
 import { Play } from '../play/Play';
 import { formatMs } from '../format';
+import { PLAYABLE_LEVELS, levelLabel } from '../../model/levels';
 
-const LEVELS: Difficulty[] = ['easy', 'medium', 'hard', 'expert', 'rachel'];
 const COUNTDOWN_MS = 3000;
 /** After this long alone in the room, explain what might be wrong. */
 const LONELY_HINT_MS = 30_000;
@@ -362,7 +362,7 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
     const round = x.round + 1;
     update((y) => ({ ...y, phase: 'generating', round, puzzle: null, startAt: null, result: null, notice: null }));
     toOpp({ t: 'generating', round });
-    const maxPip = x.difficulty === 'rachel' ? 9 : 6;
+    const maxPip = 6;
     try {
       const q = await runEngine('quick', { ...DEFAULT_OPTIONS, maxPip, difficulty: x.difficulty, seed: randomSeed() }).promise;
       if (!q.ok) throw new Error(q.error);
@@ -527,9 +527,9 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
             <label>
               Level
               <select value={s.difficulty} onChange={(e) => changeLevel(e.target.value as Difficulty)} disabled={!s.host}>
-                {LEVELS.map((d) => (
+                {PLAYABLE_LEVELS.map((d) => (
                   <option key={d} value={d}>
-                    {d[0].toUpperCase() + d.slice(1)}
+                    {levelLabel(d)}
                   </option>
                 ))}
               </select>
@@ -554,7 +554,7 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
 
       {s.phase === 'generating' && (
         <section className="panel center">
-          <span className="spinner" /> Preparing a {s.difficulty} puzzle for round {s.round}…
+          <span className="spinner" /> Preparing a {levelLabel(s.difficulty)} puzzle for round {s.round}…
         </section>
       )}
 

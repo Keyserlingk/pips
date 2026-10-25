@@ -7,6 +7,7 @@ import { shareUrl } from '../../model/serialize';
 import { runEngine } from '../../engine/client';
 import type { GenMode, GenStats } from '../../engine/generator';
 import { validateLayout } from '../../engine/generator';
+import { levelLabel } from '../../model/levels';
 import { mulberry32, randomSeed } from '../../engine/rng';
 import { randomShape } from '../../engine/shape';
 import { tileability } from '../../engine/tiling';
@@ -477,8 +478,7 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
                   <option value="easy">Easy</option>
                   <option value="medium">Medium</option>
                   <option value="hard">Hard</option>
-                  <option value="expert">Expert (up to 10 s)</option>
-                  <option value="rachel">Rachel: much harder, best with double-nine (up to 15 s)</option>
+                  <option value="expert">Rachel (up to 10 s)</option>
                 </select>
               </label>
               <label>
@@ -556,7 +556,7 @@ export function Editor({ id, onHome, onPlay }: { id: string; onHome: () => void;
                 {stats.solutions > 0 && stats.aborted && <span className="muted"> (search limit reached)</span>}
                 <span className="muted">
                   {' '}
-                  · rated <strong>{stats.rating}</strong>
+                  · rated <strong>{levelLabel(stats.rating)}</strong>
                   {stats.entryPoints !== undefined &&
                     ` · ${stats.entryPoints} starting point${stats.entryPoints === 1 ? '' : 's'}`}
                   {' '}· {stats.nodes.toLocaleString()} search steps
