@@ -336,9 +336,12 @@ export function Play({
         </button>
         {!race && (
           <>
-            <button className="btn ghost" onClick={reveal}>
-              Reveal
-            </button>
+            {/* Daily puzzles are the same for everyone: no revealing the answer. */}
+            {source !== 'daily' && (
+              <button className="btn ghost" onClick={reveal}>
+                Reveal
+              </button>
+            )}
             <button className="btn ghost" onClick={share}>
               Share
             </button>
@@ -458,9 +461,12 @@ export function Play({
               <button className="btn" onClick={onHome}>
                 Home
               </button>
-              <button className="btn ghost" onClick={reset}>
-                Play again
-              </button>
+              {/* A daily puzzle counts once: no replaying it for a better time. */}
+              {source !== 'daily' && (
+                <button className="btn ghost" onClick={reset}>
+                  Play again
+                </button>
+              )}
               <button className="btn ghost" onClick={() => setDismissed(true)}>
                 Close
               </button>
