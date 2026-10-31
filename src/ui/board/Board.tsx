@@ -30,24 +30,37 @@ interface Props {
   onPointerUp?: (e: React.PointerEvent<SVGSVGElement>) => void;
 }
 
-/** Board coordinates (in viewBox units) → cell, using the rendered size of the svg. */
-export function cellAt(svg: SVGSVGElement | null, width: number, height: number, x: number, y: number): Cell | null {
+/** Where the board's top-left square starts on screen, and how many pixels one square takes. */
+export function boardFrame(svg: SVGSVGElement | null, width: number, height: number): { left: number; top: number; px: number } | null {
   if (!svg) return null;
   const rect = svg.getBoundingClientRect();
   const vw = width * S + 2 * PAD;
   const vh = height * S + 2 * PAD;
   const scale = Math.min(rect.width / vw, rect.height / vh);
-  const ox = rect.left + (rect.width - vw * scale) / 2;
-  const oy = rect.top + (rect.height - vh * scale) / 2;
-  const c = Math.floor(((x - ox) / scale - PAD) / S);
-  const r = Math.floor(((y - oy) / scale - PAD) / S);
+  return {
+    left: rect.left + (rect.width - vw * scale) / 2 + PAD * scale,
+    top: rect.top + (rect.height - vh * scale) / 2 + PAD * scale,
+    px: S * scale,
+  };
+}
+
+/** Screen point → board position in cells (fractional; may lie outside the grid). */
+export function boardPoint(svg: SVGSVGElement | null, width: number, height: number, x: number, y: number) {
+  const f = boardFrame(svg, width, height);
+  return f ? { x: (x - f.left) / f.px, y: (y - f.top) / f.px } : null;
+}
+
+/** Screen point → the grid square under it, if any. */
+export function cellAt(svg: SVGSVGElement | null, width: number, height: number, x: number, y: number): Cell | null {
+  const p = boardPoint(svg, width, height, x, y);
+  if (!p) return null;
+  const c = Math.floor(p.x);
+  const r = Math.floor(p.y);
   return r >= 0 && c >= 0 && r < height && c < width ? { r, c } : null;
 }
 
 export function cellPixels(svg: SVGSVGElement | null, width: number, height: number): number {
-  if (!svg) return 60;
-  const rect = svg.getBoundingClientRect();
-  return S * Math.min(rect.width / (width * S + 2 * PAD), rect.height / (height * S + 2 * PAD));
+  return boardFrame(svg, width, height)?.px ?? 60;
 }
 
 const INSET = 13;

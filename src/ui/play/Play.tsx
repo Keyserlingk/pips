@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Cell, Puzzle } from '../../model/types';
 import { DIRS, add, constraintRule, evaluate, key, newId, ruleKey, sameCell } from '../../model/cells';
 import { type Orient, type PlayState, type Snapshot, getPuzzle, loadProgress, savePuzzle, saveProgress } from '../../model/storage';
 import { samePuzzle, shareUrl } from '../../model/serialize';
 import { runEngine } from '../../engine/client';
 import { levelClass, levelLabel } from '../../model/levels';
-import { Board, type BoardDomino, cellAt, cellPixels } from '../board/Board';
+import { Board, type BoardDomino, boardFrame, boardPoint, cellAt, cellPixels } from '../board/Board';
 import { DominoShape, S } from '../board/DominoShape';
+import { type Parked, type Rect, dropRect, findSpot, inside, parkedRect, turned, within } from './parking';
 
 const fresh = (): PlayState => ({ placed: {}, tray: {}, elapsed: 0, solved: false });
 
@@ -19,11 +20,21 @@ const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padSta
 const firstHalf = (o: Orient): 0 | 1 => (o < 2 ? 0 : 1);
 const isHorizontal = (o: Orient) => o % 2 === 0;
 
+type Source = 'tray' | 'board' | 'parked';
+
+/** The board's position inside the table around it, and the table's extent in cells. */
+interface TableFrame {
+  ox: number;
+  oy: number;
+  px: number;
+  bounds: Rect;
+}
+
 interface DragInfo {
   idx: number;
   half: 0 | 1;
   orient: Orient;
-  from: 'tray' | 'board';
+  from: Source;
   startX: number;
   startY: number;
   moved: boolean;
@@ -72,6 +83,8 @@ export function Play({
   const [toast, setToast] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [frame, setFrame] = useState<TableFrame | null>(null);
   const dragRef = useRef<DragInfo | null>(null);
   const active = useMemo(() => new Set(puzzle.cells.map(key)), [puzzle]);
 
@@ -94,6 +107,34 @@ export function Play({
   }, [st.solved, startAt]);
 
   const cellsOf = (p: { anchor: Cell; orient: Orient }) => [p.anchor, add(p.anchor, DIRS[p.orient])] as const;
+
+  const measure = (): TableFrame | null => {
+    const table = tableRef.current?.getBoundingClientRect();
+    const f = boardFrame(svgRef.current, puzzle.width, puzzle.height);
+    if (!table || !f) return null;
+    const bounds = { x: (table.left - f.left) / f.px, y: (table.top - f.top) / f.px, w: table.width / f.px, h: table.height / f.px };
+    return { ox: f.left - table.left, oy: f.top - table.top, px: f.px, bounds };
+  };
+
+  // Parked dominoes are drawn over the table in cells, so follow the board's size.
+  useLayoutEffect(() => {
+    const update = () => setFrame(measure());
+    update();
+    const ro = new ResizeObserver(update);
+    if (tableRef.current) ro.observe(tableRef.current);
+    if (svgRef.current) ro.observe(svgRef.current);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puzzle]);
+
+  // Parked dominoes may not overlap the board's squares or each other.
+  const cellRects = useMemo(() => puzzle.cells.map((c) => ({ x: c.c, y: c.r, w: 1, h: 1 })), [puzzle]);
+  const blockedFor = (s: PlayState, idx: number) => [
+    ...cellRects,
+    ...Object.entries(s.parked ?? {})
+      .filter(([j]) => Number(j) !== idx)
+      .map(([, p]) => parkedRect(p)),
+  ];
 
   const { values, occupant } = useMemo(() => {
     const values = new Map<string, number>();
@@ -141,9 +182,20 @@ export function Play({
     });
   };
 
-  const rotate = (idx: number, from: 'tray' | 'board') => {
+  const rotate = (idx: number, from: Source) => {
+    const f = measure();
     setSt((s) => {
       if (from === 'tray') return { ...s, tray: { ...s.tray, [idx]: (((s.tray[idx] ?? 0) + 1) % 4) as Orient } };
+      if (from === 'parked') {
+        const p = s.parked?.[idx];
+        if (!p || !f) return s;
+        for (let k = 1; k < 4; k++) {
+          const o = ((p.orient + k) % 4) as Orient;
+          const spot = findSpot(turned(p, o), blockedFor(s, idx), f.bounds);
+          if (spot) return { ...s, parked: { ...s.parked, [idx]: { ...spot, orient: o } } };
+        }
+        return s;
+      }
       const p = s.placed[idx];
       for (let k = 1; k < 4; k++) {
         const o = ((p.orient + k) % 4) as Orient;
@@ -155,22 +207,34 @@ export function Play({
 
   const drop = (idx: number, half: 0 | 1, orient: Orient, x: number, y: number) => {
     const g = cellAt(svgRef.current, puzzle.width, puzzle.height, x, y);
+    const at = boardPoint(svgRef.current, puzzle.width, puzzle.height, x, y);
+    const f = measure();
     setSt((s) => {
       const placed = { ...s.placed };
-      if (g) {
+      const parked = { ...s.parked };
+      // On the board: snap to the squares.
+      if (g && active.has(key(g))) {
         const anchor = half === 0 ? g : add(g, { r: -DIRS[orient].r, c: -DIRS[orient].c });
-        if (fits(s, idx, anchor, orient)) {
-          placed[idx] = { anchor, orient };
-          return { ...s, placed };
-        }
-        return s; // invalid spot: leave it where it came from
+        if (!fits(s, idx, anchor, orient)) return s; // invalid spot: leave it where it came from
+        placed[idx] = { anchor, orient };
+        delete parked[idx];
+        return { ...s, placed, parked };
       }
       delete placed[idx];
-      return { ...s, placed, tray: { ...s.tray, [idx]: orient } };
+      delete parked[idx];
+      // Around the board: set it down right there, nudged clear of anything it would overlap.
+      if (at && f && inside(at, f.bounds)) {
+        const visual = firstHalf(orient) === 0 ? half : ((1 - half) as 0 | 1);
+        const spot = findSpot(dropRect(at, visual, orient), blockedFor(s, idx), f.bounds);
+        if (!spot) return s; // no room there: leave it where it came from
+        parked[idx] = { ...spot, orient };
+        return { ...s, placed, parked };
+      }
+      return { ...s, placed, parked, tray: { ...s.tray, [idx]: orient } };
     });
   };
 
-  const startDrag = (e: React.PointerEvent, idx: number, half: 0 | 1, orient: Orient, from: 'tray' | 'board') => {
+  const startDrag = (e: React.PointerEvent, idx: number, half: 0 | 1, orient: Orient, from: Source) => {
     if (st.solved || race?.locked) return;
     e.preventDefault();
     dragRef.current = { idx, half, orient, from, startX: e.clientX, startY: e.clientY, moved: false };
@@ -203,13 +267,13 @@ export function Play({
     startDrag(e, idx, sameCell(p.anchor, c) ? 0 : 1, p.orient, 'board');
   };
 
-  const onTrayDown = (e: React.PointerEvent<HTMLDivElement>, idx: number) => {
-    const o = (st.tray[idx] ?? 0) as Orient;
+  /** A domino in the tray or parked by the board: which half was grabbed? */
+  const onLooseDown = (e: React.PointerEvent<Element>, idx: number, o: Orient, from: 'tray' | 'parked') => {
     const rect = e.currentTarget.getBoundingClientRect();
     const second = isHorizontal(o) ? e.clientX > rect.left + rect.width / 2 : e.clientY > rect.top + rect.height / 2;
     const visual = second ? 1 : 0;
     const half = (firstHalf(o) === 0 ? visual : 1 - visual) as 0 | 1;
-    startDrag(e, idx, half, o, 'tray');
+    startDrag(e, idx, half, o, from);
   };
 
   const boardDominoes: BoardDomino[] = Object.entries(st.placed)
@@ -255,7 +319,7 @@ export function Play({
       const orient = DIRS.findIndex((d) => sameCell(add(anchor, d), other)) as Orient;
       placed[idx] = { anchor, orient };
     }
-    setSt((s) => ({ ...s, placed }));
+    setSt((s) => ({ ...s, placed, parked: {} }));
   };
 
   // Development builds only: lets automated browser tests finish a puzzle.
@@ -272,21 +336,28 @@ export function Play({
 
   const snapshots = st.snapshots ?? [];
   const placedCount = Object.keys(st.placed).length;
+  // A parked domino that no longer fits the table (a narrower screen) goes back to the tray.
+  const shownParked: [number, Parked][] = frame
+    ? Object.entries(st.parked ?? {})
+        .filter(([, p]) => within(parkedRect(p), frame.bounds))
+        .map(([i, p]) => [Number(i), p])
+    : [];
+  const shownSet = new Set(shownParked.map(([i]) => i));
 
   const takeSnapshot = () => {
-    if (!placedCount) return flash('Place some dominoes first');
-    const snap: Snapshot = { id: newId(), at: st.elapsed, placed: { ...st.placed }, tray: { ...st.tray } };
+    if (!placedCount && !shownSet.size) return flash('Place some dominoes first');
+    const snap: Snapshot = { id: newId(), at: st.elapsed, placed: { ...st.placed }, tray: { ...st.tray }, parked: { ...st.parked } };
     setSt((s) => ({ ...s, snapshots: [...(s.snapshots ?? []), snap].slice(-MAX_SNAPSHOTS) }));
     flash('Snapshot saved');
   };
 
   /** Puts a snapshot's board back; the timer keeps running. */
-  const restore = (snap: Snapshot) => setSt((s) => ({ ...s, placed: { ...snap.placed }, tray: { ...snap.tray } }));
+  const restore = (snap: Snapshot) => setSt((s) => ({ ...s, placed: { ...snap.placed }, tray: { ...snap.tray }, parked: { ...snap.parked } }));
 
   const dropSnapshot = (id: string) => setSt((s) => ({ ...s, snapshots: (s.snapshots ?? []).filter((x) => x.id !== id) }));
 
-  /** Takes every domino off the board; the timer and snapshots stay. */
-  const clear = () => setSt((s) => ({ ...s, placed: {} }));
+  /** Puts every domino back in the tray; the timer and snapshots stay. */
+  const clear = () => setSt((s) => ({ ...s, placed: {}, parked: {} }));
 
   const reset = () => {
     // Start over, but keep snapshots: they are only removed with their × button.
@@ -331,7 +402,7 @@ export function Play({
         <button className="btn ghost" onClick={takeSnapshot} disabled={st.solved || race?.locked} title="Save the current board so you can come back to it">
           Snapshot
         </button>
-        <button className="btn ghost" onClick={clear} disabled={st.solved || race?.locked || !placedCount} title="Take all dominoes off the board (the timer keeps running)">
+        <button className="btn ghost" onClick={clear} disabled={st.solved || race?.locked || (!placedCount && !shownSet.size)} title="Put all dominoes back in the tray (the timer keeps running)">
           Clear
         </button>
         {!race && (
@@ -366,29 +437,50 @@ export function Play({
       </div>
 
       <div className="play-area">
-        <div className="board-wrap">
-          <Board
-            svgRef={svgRef}
-            width={puzzle.width}
-            height={puzzle.height}
-            cells={puzzle.cells}
-            regions={puzzle.regions}
-            dominoes={boardDominoes}
-            status={evaluation.status}
-            onPointerDown={onBoardDown}
-          />
+        <div
+          ref={tableRef}
+          className={drag ? 'table dragging' : 'table'}
+          style={{ '--cell': `${frame?.px ?? 50}px` } as React.CSSProperties}
+        >
+          <div className="board-wrap">
+            <Board
+              svgRef={svgRef}
+              width={puzzle.width}
+              height={puzzle.height}
+              cells={puzzle.cells}
+              regions={puzzle.regions}
+              dominoes={boardDominoes}
+              status={evaluation.status}
+              onPointerDown={onBoardDown}
+            />
+          </div>
+          {frame &&
+            shownParked
+              .filter(([i]) => drag?.idx !== i)
+              .map(([i, p]) => (
+                <LooseDomino
+                  key={i}
+                  className="parked"
+                  left={frame.ox + p.x * frame.px}
+                  top={frame.oy + p.y * frame.px}
+                  px={frame.px}
+                  orient={p.orient}
+                  pips={puzzle.dominoes[i]}
+                  onPointerDown={(e) => onLooseDown(e, i, p.orient, 'parked')}
+                />
+              ))}
         </div>
 
         <div className="tray">
           {puzzle.dominoes.map((d, idx) => {
-            const onBoard = idx in st.placed || drag?.idx === idx;
+            const onBoard = idx in st.placed || shownSet.has(idx) || drag?.idx === idx;
             const o = (st.tray[idx] ?? 0) as Orient;
             const h = isHorizontal(o);
             const [first, second] = firstHalf(o) === 0 ? d : [d[1], d[0]];
             return (
               <div key={idx} className="tray-slot">
                 {!onBoard && (
-                  <div className={`tray-domino ${h ? 'h' : 'v'}`} onPointerDown={(e) => onTrayDown(e, idx)}>
+                  <div className={`tray-domino ${h ? 'h' : 'v'}`} onPointerDown={(e) => onLooseDown(e, idx, o, 'tray')}>
                     <svg viewBox={h ? `0 0 ${2 * S} ${S}` : `0 0 ${S} ${2 * S}`}>
                       <DominoShape x={0} y={0} horizontal={h} first={first} second={second} />
                     </svg>
@@ -434,7 +526,7 @@ export function Play({
             </div>
           </section>
         )}
-        <p className="hint">Drag dominoes onto the board. Tap a domino to rotate it.</p>
+        <p className="hint">Drag dominoes onto the board, or set them down anywhere around it. Tap a domino to rotate it.</p>
         {rules.length > 0 && (
           <details className="legend">
             <summary>Rules</summary>
@@ -495,17 +587,39 @@ function DragGhost({
   px: number;
   dominoes: Puzzle['dominoes'];
 }) {
-  const h = isHorizontal(orient);
-  const d = dominoes[idx];
-  const [first, second] = firstHalf(orient) === 0 ? d : [d[1], d[0]];
   const visual = firstHalf(orient) === 0 ? half : 1 - half;
+  const h = isHorizontal(orient);
   const left = h ? x - px * (visual + 0.5) : x - px / 2;
   const top = h ? y - px / 2 : y - px * (visual + 0.5);
+  return <LooseDomino className="drag-ghost" left={left} top={top} px={px} orient={orient} pips={dominoes[idx]} />;
+}
+
+/** A domino drawn at a pixel position: the drag ghost, or one parked by the board. */
+function LooseDomino({
+  className,
+  left,
+  top,
+  px,
+  orient,
+  pips,
+  onPointerDown,
+}: {
+  className: string;
+  left: number;
+  top: number;
+  px: number;
+  orient: Orient;
+  pips: Puzzle['dominoes'][number];
+  onPointerDown?: (e: React.PointerEvent<SVGSVGElement>) => void;
+}) {
+  const h = isHorizontal(orient);
+  const [first, second] = firstHalf(orient) === 0 ? pips : [pips[1], pips[0]];
   return (
     <svg
-      className="drag-ghost"
+      className={className}
       style={{ left, top, width: h ? 2 * px : px, height: h ? px : 2 * px }}
       viewBox={h ? `0 0 ${2 * S} ${S}` : `0 0 ${S} ${2 * S}`}
+      onPointerDown={onPointerDown}
     >
       <DominoShape x={0} y={0} horizontal={h} first={first} second={second} />
     </svg>
