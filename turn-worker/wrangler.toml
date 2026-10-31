@@ -1,0 +1,29 @@
+name = "pips-turn"
+main = "src/index.js"
+compatibility_date = "2025-06-01"
+
+[vars]
+# Sites allowed to ask for TURN logins (comma separated).
+ALLOWED_ORIGINS = "https://keyserlingk.github.io,http://localhost:5173"
+# Stop handing out relay logins once this month's TURN traffic passes this.
+# Cloudflare's first 1,000 GB a month are free.
+CAP_GB = "500"
+
+# Check TURN usage every 15 minutes.
+[triggers]
+crons = ["*/15 * * * *"]
+
+# Stores the latest usage reading. Create it with
+#   npx wrangler kv namespace create USAGE
+# and paste the id it prints here.
+[[kv_namespaces]]
+binding = "USAGE"
+id = "PASTE_KV_NAMESPACE_ID_HERE"
+
+# Secrets, set once each with  npx wrangler secret put <NAME>
+#   TURN_KEY_ID          TURN key ID (Realtime → TURN Server)
+#   TURN_KEY_API_TOKEN   TURN key API token
+#   CF_ACCOUNT_ID        your Cloudflare account ID
+#   CF_ANALYTICS_TOKEN   API token with the "Account Analytics: Read" permission
+#   RESEND_API_KEY       API key from resend.com
+#   NOTIFY_EMAIL         the email address you signed up to Resend with

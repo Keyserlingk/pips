@@ -1,12 +1,13 @@
 import { type Room, joinRoom, selfId } from 'trystero';
 import { type DuelMsg, parseMsg } from './protocol';
+import { type TurnServer, getTurnServers } from './turn';
 
 /*
  * Peer-to-peer connection for duels. Trystero introduces the two browsers
  * through public Nostr relays (only the short connection handshake goes
  * there, encrypted with the room code) and free public STUN servers; after
- * that, messages go directly between the players over WebRTC. No TURN relay
- * is used, so very strict networks may not connect.
+ * that, messages go directly between the players over WebRTC. When a network
+ * blocks that, they go through a Cloudflare TURN relay instead (see turn.ts).
  */
 
 const APP_ID = 'keyserlingk-pips-duel-v1';
@@ -29,9 +30,14 @@ export interface NetHandlers {
   onError(message: string): void;
 }
 
-interface OpenRoom {
+interface Joined {
   room: Room;
   send: (data: string, options?: { target: string }) => Promise<void>;
+}
+
+interface OpenRoom {
+  /** Resolves once the TURN logins are in and the room is joined. */
+  joined: Promise<Joined>;
   handlers: NetHandlers;
   leaveTimer?: ReturnType<typeof setTimeout>;
 }
@@ -43,9 +49,14 @@ interface OpenRoom {
 const rooms = new Map<string, OpenRoom>();
 
 function create(code: string, handlers: NetHandlers): OpenRoom {
+  const entry: OpenRoom = { joined: getTurnServers().then((turn) => join(code, turn, entry)), handlers };
+  return entry;
+}
+
+function join(code: string, turnConfig: TurnServer[], entry: OpenRoom): Joined {
   // trickleIce: send connection routes as they are found instead of waiting for all of
   // them, so a slow or blocked STUN server doesn't hold up the connection.
-  const room = joinRoom({ appId: APP_ID, password: code, trickleIce: true }, code, {
+  const room = joinRoom({ appId: APP_ID, password: code, trickleIce: true, turnConfig }, code, {
     onJoinError: (d) => entry.handlers.onError(d.error),
   });
   // Messages travel as JSON strings; parseMsg drops anything unexpected.
@@ -57,8 +68,7 @@ function create(code: string, handlers: NetHandlers): OpenRoom {
   });
   room.onPeerJoin = (peer) => entry.handlers.onJoin(peer);
   room.onPeerLeave = (peer) => entry.handlers.onLeave(peer);
-  const entry: OpenRoom = { room, send: (data, options) => action.send(data, options), handlers };
-  return entry;
+  return { room, send: (data, options) => action.send(data, options) };
 }
 
 export function openRoom(code: string, handlers: NetHandlers): DuelNet {
@@ -74,14 +84,14 @@ export function openRoom(code: string, handlers: NetHandlers): DuelNet {
   return {
     selfId,
     send: (msg, to) => {
-      current.send(JSON.stringify(msg), to ? { target: to } : undefined).catch(() => {});
+      current.joined.then((j) => j.send(JSON.stringify(msg), to ? { target: to } : undefined)).catch(() => {});
     },
-    ping: (peer) => current.room.ping(peer),
+    ping: (peer) => current.joined.then((j) => j.room.ping(peer)),
     leave: () => {
       clearTimeout(current.leaveTimer);
       current.leaveTimer = setTimeout(() => {
         if (rooms.get(code) === current) rooms.delete(code);
-        current.room.leave().catch(() => {});
+        current.joined.then((j) => j.room.leave()).catch(() => {});
       }, LEAVE_DELAY_MS);
     },
   };

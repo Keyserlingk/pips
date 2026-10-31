@@ -85,8 +85,8 @@ export function DuelStart({ go }: { go: (hash: string) => void }) {
           </button>
         </div>
         <p className="muted small">
-          No account needed. Works on most home and mobile networks; some company or school networks block direct
-          connections between browsers.
+          No account needed. Players connect directly, or through a relay when a network blocks that; a few strict
+          company or school networks may still block duels.
         </p>
       </section>
     </div>
@@ -498,8 +498,8 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
               {lonely && (
                 <p className="muted small">
                   Still nobody? Check that your friend opened the link or typed <strong>{code}</strong>. If they did,
-                  your networks may block direct connections between browsers (common on company Wi-Fi); try a
-                  phone hotspot or home network.
+                  both of you try reloading the page. If it still fails, one of your networks may be blocking the
+                  connection (common on company or school Wi-Fi); try a phone hotspot or home network.
                 </p>
               )}
             </div>
