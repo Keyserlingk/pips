@@ -3,8 +3,8 @@ main = "src/index.js"
 compatibility_date = "2025-06-01"
 
 [vars]
-# Sites allowed to ask for TURN logins (comma separated).
-ALLOWED_ORIGINS = "https://keyserlingk.github.io,http://localhost:5173"
+# Sites allowed to ask for TURN logins (comma separated). https://localhost is the Android app.
+ALLOWED_ORIGINS = "https://keyserlingk.github.io,https://localhost,http://localhost:5173"
 # Stop handing out relay logins once this month's TURN traffic passes this.
 # Cloudflare's first 1,000 GB a month are free.
 CAP_GB = "500"

@@ -8,14 +8,20 @@
     "build": "tsc --noEmit -p . && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "android:sync": "npm run build && cap sync android",
+    "android:build": "npm run android:sync && cd android && JAVA_HOME=${JAVA_HOME_21:-/usr/lib/jvm/java-21-openjdk-amd64} ./gradlew assembleDebug",
+    "android:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk"
   },
   "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "trystero": "0.25.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.6.0",
     "@types/react": "18.3.12",
     "@types/react-dom": "18.3.1",
     "@vitejs/plugin-react": "4.3.3",

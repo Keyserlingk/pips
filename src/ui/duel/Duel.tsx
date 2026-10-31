@@ -11,6 +11,7 @@ import { validFinish } from '../../duel/referee';
 import { Play } from '../play/Play';
 import { formatMs } from '../format';
 import { PLAYABLE_LEVELS, levelLabel } from '../../model/levels';
+import { pageUrl } from '../../model/site';
 
 const COUNTDOWN_MS = 3000;
 /** After this long alone in the room, explain what might be wrong. */
@@ -28,7 +29,7 @@ interface Reaction {
 }
 
 
-const inviteUrl = (code: string) => `${location.origin}${location.pathname}#/duel/${code}`;
+const inviteUrl = (code: string) => `${pageUrl()}#/duel/${code}`;
 
 // ---------------------------------------------------------------- start page
 

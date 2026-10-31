@@ -75,3 +75,21 @@ One-time setup:
 
 The Worker only answers requests from the sites listed in `ALLOWED_ORIGINS` in
 `turn-worker/wrangler.toml`. Without `VITE_TURN_URL`, duels use direct connections only.
+
+## Android app
+
+The Android app is the built site wrapped with [Capacitor](https://capacitorjs.com). It carries its
+own copy of the site, so it works offline (duels still need internet). Links shared from the app
+point to the public site, so friends can open them in a browser.
+
+Needs the Android SDK (`ANDROID_HOME`) and JDK 21 (the scripts use
+`/usr/lib/jvm/java-21-openjdk-amd64`; set `JAVA_HOME_21` to use another).
+
+```bash
+npm run android:build     # build the site, copy it into android/, build a debug APK
+npm run android:install   # install it on a phone connected with USB debugging on
+```
+
+The APK ends up in `android/app/build/outputs/apk/debug/app-debug.apk`. Changes to the site reach
+the app only when it is rebuilt and reinstalled. The icon and splash screen sources are in
+`assets/` (regenerate with `npx @capacitor/assets generate --android`).

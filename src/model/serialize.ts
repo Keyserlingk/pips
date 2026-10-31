@@ -1,5 +1,6 @@
 import type { Constraint, Difficulty, ExtraKind, Puzzle } from './types';
 import { type Scoring, type SeriesRun, standings } from './series';
+import { pageUrl } from './site';
 
 /*
  * Share links: #/p/<code>. The code is a compact JSON form of the puzzle,
@@ -199,7 +200,7 @@ export async function decodeGhost(code: string): Promise<GhostSeries | null> {
   }
 }
 
-export const ghostUrl = async (series: GhostSeries) => `${location.origin}${location.pathname}#/g/${await encodeGhost(series)}`;
+export const ghostUrl = async (series: GhostSeries) => `${pageUrl()}#/g/${await encodeGhost(series)}`;
 
 /** Pieces a ghost had on the board `ms` into its run. */
 export function ghostPlaced(run: GhostRun, ms: number): number {
@@ -211,7 +212,7 @@ export function ghostPlaced(run: GhostRun, ms: number): number {
   return placed;
 }
 
-export const shareUrl = async (p: Puzzle) => `${location.origin}${location.pathname}#/p/${await encodeShare(p)}`;
+export const shareUrl = async (p: Puzzle) => `${pageUrl()}#/p/${await encodeShare(p)}`;
 
 /** Old-style links (#/play/s/<code>): plain base64url JSON of the whole puzzle. */
 export function decodeLegacy(code: string): Puzzle | null {
