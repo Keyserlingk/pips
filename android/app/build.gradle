@@ -1,5 +1,10 @@
 apply plugin: 'com.android.application'
 
+// CI sets the version and the release signing key through environment variables
+// (see .github/workflows/android.yml). Local builds fall back to these defaults.
+def env = System.getenv()
+def releaseKeystore = env.ANDROID_KEYSTORE_PATH
+
 android {
     namespace = "io.github.keyserlingk.pips"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +12,8 @@ android {
         applicationId "io.github.keyserlingk.pips"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode env.VERSION_CODE ? env.VERSION_CODE.toInteger() : 1
+        versionName env.VERSION_NAME ?: "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +21,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (releaseKeystore) {
+            release {
+                storeFile file(releaseKeystore)
+                storePassword env.ANDROID_KEYSTORE_PASSWORD
+                keyAlias env.ANDROID_KEY_ALIAS
+                keyPassword env.ANDROID_KEY_PASSWORD
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseKeystore) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

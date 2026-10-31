@@ -1,3 +1,7 @@
 node_modules
 dist
 *.local
+
+# Android signing keys: never commit these
+*.jks
+*.keystore
