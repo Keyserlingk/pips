@@ -50,6 +50,8 @@ export interface PlayState {
   tray: Record<number, Orient>;
   elapsed: number;
   solved: boolean;
+  /** Tray slot for each domino, once the player has rearranged the tray (missing: its own index). */
+  slots?: Record<number, number>;
   /** Dominoes set down around the board, by position in cells (missing in older saves). */
   parked?: Record<number, { x: number; y: number; orient: Orient }>;
   /** Saved board setups the player can go back to (missing in older saves). */

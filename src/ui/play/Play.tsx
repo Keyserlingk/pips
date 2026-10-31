@@ -14,6 +14,8 @@ const fresh = (): PlayState => ({ placed: {}, tray: {}, elapsed: 0, solved: fals
 /** Oldest snapshots are dropped beyond this. */
 const MAX_SNAPSHOTS = 12;
 
+const slotOf = (s: PlayState, idx: number) => s.slots?.[idx] ?? idx;
+
 const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 /** Which half is drawn left/top for a given orientation. */
@@ -209,6 +211,21 @@ export function Play({
     const g = cellAt(svgRef.current, puzzle.width, puzzle.height, x, y);
     const at = boardPoint(svgRef.current, puzzle.width, puzzle.height, x, y);
     const f = measure();
+    // Dropped on a tray slot: put it there, swapping places with the domino that has that slot.
+    const slotEl = document.elementFromPoint(x, y)?.closest<HTMLElement>('.tray-slot');
+    if (slotEl) {
+      const target = Number(slotEl.dataset.slot);
+      setSt((s) => {
+        const placed = { ...s.placed };
+        const parked = { ...s.parked };
+        delete placed[idx];
+        delete parked[idx];
+        const other = puzzle.dominoes.findIndex((_, j) => slotOf(s, j) === target);
+        const slots = { ...s.slots, [other]: slotOf(s, idx), [idx]: target };
+        return { ...s, placed, parked, slots, tray: { ...s.tray, [idx]: orient } };
+      });
+      return;
+    }
     setSt((s) => {
       const placed = { ...s.placed };
       const parked = { ...s.parked };
@@ -343,6 +360,9 @@ export function Play({
         .map(([i, p]) => [Number(i), p])
     : [];
   const shownSet = new Set(shownParked.map(([i]) => i));
+  /** Which domino sits in each tray slot. */
+  const trayOrder: number[] = [];
+  puzzle.dominoes.forEach((_, idx) => (trayOrder[slotOf(st, idx)] = idx));
 
   const takeSnapshot = () => {
     if (!placedCount && !shownSet.size) return flash('Place some dominoes first');
@@ -472,13 +492,14 @@ export function Play({
         </div>
 
         <div className="tray">
-          {puzzle.dominoes.map((d, idx) => {
+          {trayOrder.map((idx, slot) => {
+            const d = puzzle.dominoes[idx];
             const onBoard = idx in st.placed || shownSet.has(idx) || drag?.idx === idx;
             const o = (st.tray[idx] ?? 0) as Orient;
             const h = isHorizontal(o);
             const [first, second] = firstHalf(o) === 0 ? d : [d[1], d[0]];
             return (
-              <div key={idx} className="tray-slot">
+              <div key={slot} className="tray-slot" data-slot={slot}>
                 {!onBoard && (
                   <div className={`tray-domino ${h ? 'h' : 'v'}`} onPointerDown={(e) => onLooseDown(e, idx, o, 'tray')}>
                     <svg viewBox={h ? `0 0 ${2 * S} ${S}` : `0 0 ${S} ${2 * S}`}>
@@ -526,7 +547,7 @@ export function Play({
             </div>
           </section>
         )}
-        <p className="hint">Drag dominoes onto the board, or set them down anywhere around it. Tap a domino to rotate it.</p>
+        <p className="hint">Drag dominoes onto the board, or set them down anywhere around it. Drop one on a tray slot to move it there. Tap a domino to rotate it.</p>
         {rules.length > 0 && (
           <details className="legend">
             <summary>Rules</summary>
