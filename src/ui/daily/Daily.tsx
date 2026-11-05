@@ -58,7 +58,25 @@ export function dailyStatus(date: string, level: Difficulty) {
 
 export const solvedToday = () => PLAYABLE_LEVELS.filter((l) => dailyStatus(todayKey(), l).state === 'solved').length;
 
+/** Seconds spent on today's daily puzzles so far, solved or not. */
+export const dailyTimeToday = () => PLAYABLE_LEVELS.reduce((sum, l) => sum + dailyStatus(todayKey(), l).elapsed, 0);
+
 // ------------------------------------------------------------- #/daily
+
+/** Total time on today's four puzzles; shown once one has been started. */
+function DailyTotal() {
+  const solved = solvedToday();
+  const seconds = dailyTimeToday();
+  if (!seconds) return null;
+  const all = solved === PLAYABLE_LEVELS.length;
+  return (
+    <p className="daily-total center">
+      {all ? 'All four solved in ' : 'Total today: '}
+      <strong>{formatTime(seconds)}</strong>
+      {!all && <span className="muted"> · {solved}/{PLAYABLE_LEVELS.length} solved</span>}
+    </p>
+  );
+}
 
 export function DailyHome({ go }: { go: (hash: string) => void }) {
   const date = todayKey();
@@ -114,6 +132,7 @@ export function DailyHome({ go }: { go: (hash: string) => void }) {
           );
         })}
       </div>
+      <DailyTotal />
       <p className="muted small center">
         Puzzles are prepared on your device the first time you open them today (Rachel can take a little while on a
         phone).

@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
 import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
-import { solvedToday } from '../daily/Daily';
+import { dailyTimeToday, solvedToday } from '../daily/Daily';
+import { MenuButton, MenuItem } from '../Menu';
 import { deletePuzzle, loadLibrary, loadTodo, saveProgress, savePuzzle, saveQuick } from '../../model/storage';
 import { isPuzzle } from '../../model/serialize';
 import { QrModal } from '../qr/QrModal';
@@ -10,6 +11,8 @@ import { runEngine } from '../../engine/client';
 import { randomSeed } from '../../engine/rng';
 import { GENERATOR_VERSION } from '../../engine/version';
 import { puzzleLink, randomPuzzle, seedOptions } from '../../model/seedLink';
+
+const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
 /** Shown while the slower levels generate (no time limit, so they can be shared as seed links). */
 export const WAIT: Partial<Record<Difficulty, string>> = { hard: ' (can take a few seconds)', expert: ' (can take up to a minute)' };
@@ -21,6 +24,7 @@ export function Home({ go }: { go: (hash: string) => void }) {
   const [withExtras, setWithExtras] = useState(false);
   const [qr, setQr] = useState<{ link: string; title: string } | null>(null);
   const todoCount = loadTodo().length;
+  const dailySeconds = dailyTimeToday();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const quick = (difficulty: Difficulty) => {
@@ -59,7 +63,10 @@ export function Home({ go }: { go: (hash: string) => void }) {
         <p className="muted">Place every domino so that each coloured region meets its condition.</p>
         <div className="row center daily-entry">
           <button className="btn daily-button" onClick={() => go('#/daily')}>
-            📅 Daily <span className="daily-count">{solvedToday()}/4 today</span>
+            📅 Daily{' '}
+            <span className="daily-count">
+              {solvedToday()}/4 today{dailySeconds > 0 && ` · ${formatTime(dailySeconds)}`}
+            </span>
           </button>
         </div>
         <div className="quick">
@@ -71,22 +78,19 @@ export function Home({ go }: { go: (hash: string) => void }) {
           ))}
         </div>
         <div className="row center duel-entry">
-          <button className="btn" onClick={() => go('#/duel')}>
-            ⚔ Duel a friend
-          </button>
-          <button className="btn ghost" onClick={() => go('#/ghost')}>
-            👻 Ghost challenge
-          </button>
-          <button className="btn ghost" onClick={() => go('#/scan')} title="Open a puzzle from a QR code, without internet">
-            📷 Scan QR code
-          </button>
-        </div>
-        <div className="row center duel-entry">
+          <MenuButton label="👥 Play with friends ▾" className="btn" align="left">
+            <MenuItem onClick={() => go('#/duel')} hint="Race each other live on the same puzzle">
+              ⚔ Duel a friend
+            </MenuItem>
+            <MenuItem onClick={() => go('#/ghost')} hint="Solve puzzles, then send friends a link to race your times">
+              👻 Ghost challenge
+            </MenuItem>
+            <MenuItem onClick={() => go('#/scan')} hint="Open a puzzle from a friend's QR code, no internet needed">
+              📷 Scan QR code
+            </MenuItem>
+          </MenuButton>
           <button className="btn ghost" onClick={() => go('#/history')}>
-            📅 History
-          </button>
-          <button className="btn ghost" onClick={() => go('#/todo')}>
-            📌 To do{todoCount ? ` (${todoCount})` : ''}
+            📅 History &amp; to do{todoCount ? ` (${todoCount})` : ''}
           </button>
         </div>
         <label className="check extras-toggle">

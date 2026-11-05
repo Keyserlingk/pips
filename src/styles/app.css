@@ -124,10 +124,12 @@ label.radio span { display: block; }
 .menu-anchor { position: relative; }
 .menu-button { padding: 4px 14px; font-size: 1.2rem; line-height: 1; }
 .menu {
-  position: absolute; top: calc(100% + 6px); right: 0; z-index: 20; width: max-content; min-width: 220px;
+  position: absolute; top: calc(100% + 6px); z-index: 20; width: max-content; min-width: 220px;
   max-width: min(280px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--border);
   border-radius: 14px; padding: 6px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
 }
+.menu.right { right: 0; }
+.menu.left { left: 0; }
 .menu button {
   display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; border: 0; background: none;
   color: var(--text); font: inherit; font-weight: 700; padding: 8px 10px; border-radius: 10px; cursor: pointer;
@@ -335,5 +337,6 @@ html.native-scan .top, html.native-scan .update-banner { visibility: hidden; }
 .daily-button { font-size: 1.05rem; padding: 10px 22px; }
 .daily-count { margin-left: 8px; font-weight: 600; opacity: 0.75; font-size: 0.85rem; }
 .daily .quick { margin-top: 0; }
+.daily-total { font-size: 1.05rem; margin: 14px 0 4px; }
 .quick-card.solved { outline: 3px solid var(--ok); outline-offset: 2px; }
 .quick-card:disabled { cursor: progress; }
