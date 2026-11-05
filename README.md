@@ -27,6 +27,10 @@ Other scripts: `npm test` (engine tests), `npm run build` (static build in `dist
   seed, fingerprint); the receiver regenerates the puzzle. **Share ▾ → Copy full puzzle link** sends the
   whole puzzle instead. Bump `GENERATOR_VERSION` in `src/engine/version.ts` whenever the generator starts
   making different puzzles from the same seed (a test in `src/model/seedLink.test.ts` catches this).
+- **History** keeps every solved game (not ones finished with Reveal) with its time and an optional 1–5 star
+  rating, under a GitHub-style calendar of games per day; tap a game to revisit it. **📌 To do** sets a puzzle
+  aside; solving it moves it to the history. Entries store a random puzzle's seed, a daily puzzle's date, or
+  else the compressed puzzle, so they can always be reopened.
 - **Share ▾ → Show QR code** shows the same link as a QR code. **📷 Scan QR code** on the home screen reads one
   with the camera and opens the puzzle on the device, so the app can pass puzzles on without internet.
 

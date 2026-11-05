@@ -6,6 +6,7 @@ import { THEMES } from './styles/themes';
 import { Home, WAIT } from './ui/home/Home';
 import { Scan } from './ui/qr/Scan';
 import { UpdateBanner } from './ui/update/UpdateBanner';
+import { HistoryPage, SavedPlay, TodoPage } from './ui/history/History';
 import { Play } from './ui/play/Play';
 import { Editor } from './ui/editor/Editor';
 import { Duel, DuelStart } from './ui/duel/Duel';
@@ -59,7 +60,11 @@ export function App() {
     );
 
   let page: JSX.Element;
-  if (parts[0] === 'scan') {
+  if (parts[0] === 'history') {
+    page = parts[1] ? <SavedPlay key={parts[1]} list="history" id={parts[1]} go={go} /> : <HistoryPage go={go} />;
+  } else if (parts[0] === 'todo') {
+    page = parts[1] ? <SavedPlay key={parts[1]} list="todo" id={parts[1]} go={go} /> : <TodoPage go={go} />;
+  } else if (parts[0] === 'scan') {
     page = <Scan go={go} />;
   } else if (parts[0] === 's') {
     page = <SeededPlay key={parts[1]} code={parts[1] ?? ''} onHome={home} render={(p) => play(p, 'shared')} />;

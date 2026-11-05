@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
 import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
 import { solvedToday } from '../daily/Daily';
-import { deletePuzzle, loadLibrary, saveProgress, savePuzzle, saveQuick } from '../../model/storage';
+import { deletePuzzle, loadLibrary, loadTodo, saveProgress, savePuzzle, saveQuick } from '../../model/storage';
 import { isPuzzle } from '../../model/serialize';
 import { QrModal } from '../qr/QrModal';
 import { newId } from '../../model/cells';
@@ -20,6 +20,7 @@ export function Home({ go }: { go: (hash: string) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [withExtras, setWithExtras] = useState(false);
   const [qr, setQr] = useState<{ link: string; title: string } | null>(null);
+  const todoCount = loadTodo().length;
   const fileRef = useRef<HTMLInputElement>(null);
 
   const quick = (difficulty: Difficulty) => {
@@ -78,6 +79,14 @@ export function Home({ go }: { go: (hash: string) => void }) {
           </button>
           <button className="btn ghost" onClick={() => go('#/scan')} title="Open a puzzle from a QR code, without internet">
             📷 Scan QR code
+          </button>
+        </div>
+        <div className="row center duel-entry">
+          <button className="btn ghost" onClick={() => go('#/history')}>
+            📅 History
+          </button>
+          <button className="btn ghost" onClick={() => go('#/todo')}>
+            📌 To do{todoCount ? ` (${todoCount})` : ''}
           </button>
         </div>
         <label className="check extras-toggle">

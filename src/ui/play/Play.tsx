@@ -10,6 +10,8 @@ import { levelClass, levelLabel } from '../../model/levels';
 import { Board, type BoardDomino, boardFrame, boardPoint, cellAt, cellPixels } from '../board/Board';
 import { DominoShape, S } from '../board/DominoShape';
 import { QrModal } from '../qr/QrModal';
+import { Stars } from '../history/Stars';
+import { addTodo, isTodo, rateSolve, recordSolve, removeTodo } from '../../model/history';
 import { type Parked, type Rect, dropRect, findSpot, inside, parkedRect, turned, within } from './parking';
 
 const fresh = (): PlayState => ({ placed: {}, tray: {}, elapsed: 0, solved: false });
@@ -86,8 +88,16 @@ export function Play({
   const [st, setSt] = useState<PlayState>(() => (race ? null : loadProgress(puzzle.id)) ?? fresh());
   const [drag, setDrag] = useState<{ idx: number; half: 0 | 1; orient: Orient; x: number; y: number; px: number } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  // Reopening a puzzle solved earlier shows the finished board; the Solved box is for the moment of solving.
+  const [dismissed, setDismissed] = useState(() => st.solved);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [onTodo, setOnTodo] = useState(() => isTodo(puzzle.id));
+  const toggleTodo = async () => {
+    if (onTodo) removeTodo(puzzle.id);
+    else await addTodo(puzzle);
+    setOnTodo(!onTodo);
+    flash(onTodo ? 'Removed from to do' : 'Added to to do');
+  };
   const tableRef = useRef<HTMLDivElement>(null);
   const [frame, setFrame] = useState<TableFrame | null>(null);
   const dragRef = useRef<DragInfo | null>(null);
@@ -163,11 +173,20 @@ export function Play({
 
   const evaluation = useMemo(() => evaluate(puzzle, values), [puzzle, values]);
 
+  // The history entry for a solve made here, so the Solved box can rate it.
+  const [solveId, setSolveId] = useState<string | null>(null);
+  // A puzzle finished by Reveal wasn't solved: it stays out of the history (and on the to-do list).
+  const revealedRef = useRef(false);
+  const [rating, setRating] = useState<number | undefined>(undefined);
   useEffect(() => {
     if (!evaluation.solved || st.solved) return;
     setSt((s) => ({ ...s, solved: true }));
     const d = raceRef.current;
     if (d) d.onSolved(st.placed, Date.now() - d.startAt);
+    if (revealedRef.current) return;
+    // Also takes it off the to-do list.
+    recordSolve(puzzle, st.elapsed).then(setSolveId, () => {});
+    setOnTodo(false);
   }, [evaluation.solved, st.solved, st.placed]);
 
   const placedTotal = Object.keys(st.placed).length;
@@ -339,6 +358,7 @@ export function Play({
       const orient = DIRS.findIndex((d) => sameCell(add(anchor, d), other)) as Orient;
       placed[idx] = { anchor, orient };
     }
+    revealedRef.current = true;
     setSt((s) => ({ ...s, placed, parked: {} }));
   };
 
@@ -386,6 +406,9 @@ export function Play({
     // Start over, but keep snapshots: they are only removed with their × button.
     setSt((s) => ({ ...fresh(), snapshots: s.snapshots }));
     setDismissed(false);
+    revealedRef.current = false;
+    setSolveId(null);
+    setRating(undefined);
   };
 
   // Random puzzles go out as a short seed link unless the full puzzle is asked for.
@@ -455,6 +478,16 @@ export function Play({
         <button className="btn ghost" onClick={clear} disabled={st.solved || race?.locked || (!placedCount && !shownSet.size)} title="Put all dominoes back in the tray (the timer keeps running)">
           Clear
         </button>
+        {!race && !st.solved && (
+          <button
+            className={`btn ghost${onTodo ? ' on' : ''}`}
+            onClick={toggleTodo}
+            aria-pressed={onTodo}
+            title={onTodo ? 'Take it off your to-do list' : 'Keep it on your to-do list until you solve it'}
+          >
+            📌 {onTodo ? 'On to do' : 'To do'}
+          </button>
+        )}
         {!race && (
           <>
             {/* Daily puzzles are the same for everyone: no revealing the answer. */}
@@ -626,6 +659,18 @@ export function Play({
             <p>
               You finished in <strong>{formatTime(st.elapsed)}</strong>.
             </p>
+            {solveId && (
+              <div className="rate">
+                <span className="muted small">Rate this puzzle (optional)</span>
+                <Stars
+                  value={rating}
+                  onChange={(n) => {
+                    setRating(n);
+                    rateSolve(solveId, n);
+                  }}
+                />
+              </div>
+            )}
             <div className="row">
               <button className="btn" onClick={onHome}>
                 Home

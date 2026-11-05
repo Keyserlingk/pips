@@ -1,4 +1,5 @@
 import type { Cell, Puzzle } from './types';
+import type { HistoryEntry, TodoEntry } from './history';
 
 const LIB = 'pips.library';
 const QUICK = 'pips.quick';
@@ -6,6 +7,8 @@ const REMIX = 'pips.remix';
 const PROGRESS = 'pips.progress.';
 const THEME = 'pips.theme';
 const UPDATE = 'pips.update';
+const HISTORY = 'pips.history';
+const TODO = 'pips.todo';
 
 function read<T>(k: string): T | null {
   try {
@@ -101,3 +104,8 @@ export interface UpdateState {
 }
 export const loadUpdateState = () => read<UpdateState>(UPDATE);
 export const saveUpdateState = (s: UpdateState) => write(UPDATE, s);
+
+export const loadHistory = () => read<HistoryEntry[]>(HISTORY) ?? [];
+export const saveHistory = (h: HistoryEntry[]) => write(HISTORY, h);
+export const loadTodo = () => read<TodoEntry[]>(TODO) ?? [];
+export const saveTodo = (t: TodoEntry[]) => write(TODO, t);

@@ -144,6 +144,32 @@ label.radio span { display: block; }
   padding: 10px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border);
 }
 .update-banner .btn { text-decoration: none; }
+/* History, to do, and the solved-games calendar (GitHub-style). */
+.history { display: flex; flex-direction: column; gap: 14px; max-width: 760px; margin: 0 auto; }
+.history-tabs button.on { background: var(--text); color: var(--bg); }
+.history-total { margin: 0 0 10px; }
+.history-day h4 { margin: 6px 0 8px; }
+.history-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.history-item { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px 14px; }
+.history-item > div { flex: 1; min-width: 160px; }
+.calendar-wrap { overflow-x: auto; padding-bottom: 4px; }
+.calendar { --day: 12px; display: grid; grid-template-rows: auto repeat(7, var(--day)); gap: 3px; width: max-content; }
+.calendar-month { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+.day { width: var(--day); height: var(--day); border-radius: 3px; border: 0; padding: 0; display: inline-block; cursor: pointer; }
+.day.l0 { background: var(--cell-bg); }
+.day.l1 { background: color-mix(in srgb, var(--accent) 30%, var(--cell-bg)); }
+.day.l2 { background: color-mix(in srgb, var(--accent) 55%, var(--cell-bg)); }
+.day.l3 { background: color-mix(in srgb, var(--accent) 78%, var(--cell-bg)); }
+.day.l4 { background: var(--accent); }
+.day.sel { outline: 2px solid var(--text); outline-offset: 1px; }
+.calendar-legend { display: flex; align-items: center; justify-content: flex-end; gap: 3px; margin-top: 8px; }
+.calendar-legend .day { cursor: default; width: 10px; height: 10px; }
+.stars { display: inline-flex; }
+.stars button { border: 0; background: none; padding: 2px; font-size: 1.3rem; line-height: 1; cursor: pointer; color: var(--border); }
+.stars button.on { color: #e0a526; }
+.rate { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 4px 0 14px; }
+.btn.ghost.on { border-color: var(--accent); color: var(--accent); }
+.link { border: 0; background: none; padding: 0; color: var(--accent); font: inherit; cursor: pointer; text-decoration: underline; }
 .hint { text-align: center; color: var(--muted); font-size: 0.85rem; margin: 6px 0 0; }
 .drag-ghost { position: fixed; pointer-events: none; z-index: 50; filter: drop-shadow(0 8px 12px rgb(0 0 0 / 0.25)); }
 
