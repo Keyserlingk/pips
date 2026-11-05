@@ -13,7 +13,6 @@ import { pipsRoute } from './links';
 export function NativeScan({ go }: { go: (hash: string) => void }) {
   const [error, setError] = useState<string | null>(null);
   const [notPips, setNotPips] = useState(false);
-  const [zoom, setZoom] = useState<{ min: number; max: number; value: number } | null>(null);
   const goRef = useRef(go);
   goRef.current = go;
 
@@ -37,9 +36,7 @@ export function NativeScan({ go }: { go: (hash: string) => void }) {
       root.classList.add('native-scan');
       await BarcodeScanner.startScan({ formats: [BarcodeFormat.QrCode], resolution: Resolution['1920x1080'] });
       // Closed while the camera was starting: stop it again.
-      if (!live) return BarcodeScanner.stopScan();
-      const [{ zoomRatio: min }, { zoomRatio: max }] = await Promise.all([BarcodeScanner.getMinZoomRatio(), BarcodeScanner.getMaxZoomRatio()]);
-      if (live && max > min) setZoom({ min, max: Math.min(max, min * 5), value: min });
+      if (!live) await BarcodeScanner.stopScan();
     })().catch((e: Error) => live && setError(e.message || 'Could not start the camera.'));
     return () => {
       live = false;
@@ -48,11 +45,6 @@ export function NativeScan({ go }: { go: (hash: string) => void }) {
       BarcodeScanner.stopScan().catch(() => {});
     };
   }, []);
-
-  const changeZoom = (value: number) => {
-    setZoom((z) => z && { ...z, value });
-    BarcodeScanner.setZoomRatio({ zoomRatio: value }).catch(() => {});
-  };
 
   return (
     <div className="scan native">
@@ -71,12 +63,6 @@ export function NativeScan({ go }: { go: (hash: string) => void }) {
             <div className="scan-frame" />
           </div>
           <div className="scan-panel">
-            {zoom && (
-              <label className="scan-zoom">
-                <span className="small">Zoom</span>
-                <input type="range" min={zoom.min} max={zoom.max} step={0.1} value={zoom.value} onChange={(e) => changeZoom(Number(e.target.value))} />
-              </label>
-            )}
             <p className="small center">
               {notPips ? "That QR code isn't a Pips puzzle." : 'Point the camera at a Pips QR code (Share ▾ → Show QR code). No internet needed.'}
             </p>
