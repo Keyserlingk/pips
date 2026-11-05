@@ -4,6 +4,8 @@ import { DIRS, add, constraintRule, evaluate, key, newId, ruleKey, sameCell } fr
 import { type Orient, type PlayState, type Snapshot, getPuzzle, loadProgress, savePuzzle, saveProgress } from '../../model/storage';
 import { samePuzzle, shareUrl } from '../../model/serialize';
 import { canShareSeed, puzzleLink } from '../../model/seedLink';
+import { duration, praise, puzzleName, resultText } from '../../model/result';
+import { pageUrl } from '../../model/site';
 import { GENERATOR_VERSION } from '../../engine/version';
 import { runEngine } from '../../engine/client';
 import { levelClass, levelLabel } from '../../model/levels';
@@ -439,6 +441,18 @@ export function Play({
     setQr(await puzzleLink(puzzle));
   };
 
+  // The Solved box: a word of praise, and the result to paste to friends (with the puzzle's link).
+  const [cheer] = useState(praise);
+  const shareResult = async () => {
+    try {
+      const link = source === 'daily' ? pageUrl() : await puzzleLink(puzzle);
+      await navigator.clipboard.writeText(resultText(puzzle, st.elapsed, link));
+      flash('Result copied');
+    } catch {
+      flash('Could not copy the result');
+    }
+  };
+
   const share = async (full: boolean) => {
     try {
       await navigator.clipboard.writeText(full ? await shareUrl(puzzle) : await puzzleLink(puzzle));
@@ -642,9 +656,9 @@ export function Play({
       {st.solved && !dismissed && !race && (
         <div className="modal-backdrop">
           <div className="modal">
-            <h2>Solved!</h2>
+            <h2>{cheer}</h2>
             <p>
-              You finished in <strong>{formatTime(st.elapsed)}</strong>.
+              You finished {puzzleName(puzzle)} in <strong>{duration(st.elapsed)}</strong>.
             </p>
             {solveId && (
               <div className="rate">
@@ -659,7 +673,10 @@ export function Play({
               </div>
             )}
             <div className="row">
-              <button className="btn" onClick={onHome}>
+              <button className="btn" onClick={shareResult}>
+                📋 Share result
+              </button>
+              <button className="btn ghost" onClick={onHome}>
                 Home
               </button>
               {/* A daily puzzle counts once: no replaying it for a better time. */}
