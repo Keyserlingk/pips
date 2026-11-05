@@ -12,6 +12,7 @@
     "android:sync": "npm run build && cap sync android",
     "android:build": "npm run android:sync && cd android && JAVA_HOME=${JAVA_HOME_21:-/usr/lib/jvm/java-21-openjdk-amd64} ./gradlew assembleDebug",
     "android:install": "adb install -r android/app/build/outputs/apk/debug/app-debug.apk",
+    "serve": "scripts/serve.sh",
     "release": "scripts/release.sh"
   },
   "dependencies": {

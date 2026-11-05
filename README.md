@@ -8,8 +8,11 @@ Requires Node 18+.
 
 ```bash
 npm install
-npm run dev        # → http://localhost:5173
+scripts/serve.sh             # or: npm run serve   → http://localhost:5173, reloads as you edit
+scripts/serve.sh --preview   # the production build, as it will be published (port 4173)
 ```
+
+The script also prints the address for phones on the same Wi-Fi, with a QR code to scan. Ctrl+C stops it.
 
 Other scripts: `npm test` (engine tests), `npm run build` (static build in `dist/`), `npm run preview`.
 
