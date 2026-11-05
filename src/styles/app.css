@@ -101,6 +101,7 @@ label.radio span { display: block; }
 .play-bar { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
 .play-title { display: flex; align-items: center; flex: 1; justify-content: center; font-size: 1.1rem; }
 .timer { font-variant-numeric: tabular-nums; font-weight: 700; min-width: 56px; text-align: right; }
+.play-actions { display: flex; gap: 8px; justify-content: center; margin: 10px 0 4px; }
 .play-area { display: flex; flex-direction: column; align-items: center; gap: 18px; }
 .play-area .board-wrap { width: 100%; }
 /* The board plus room around it where dominoes can be set down anywhere. */

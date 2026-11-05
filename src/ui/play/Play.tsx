@@ -471,66 +471,69 @@ export function Play({
         </div>
         <span className="play-right">
           <span className="timer">{formatTime(st.elapsed)}</span>
-          {/* Everything else lives in this menu, to keep the screen for the board. */}
-          <span className="menu-anchor">
-            <button className="btn ghost menu-button" onClick={() => setMenuOpen((m) => !m)} aria-label="More actions" aria-expanded={menuOpen}>
-              ⋯
-            </button>
-            {menuOpen && (
-              <div className="menu" role="menu" ref={menuRef} onClick={(e) => (e.target as Element).closest('button') && setMenuOpen(false)}>
-                <MenuItem onClick={takeSnapshot} disabled={st.solved || race?.locked} hint="Save the board to come back to">
-                  📸 Snapshot
-                </MenuItem>
-                <MenuItem onClick={clear} disabled={st.solved || race?.locked || (!placedCount && !shownSet.size)} hint="All dominoes back to the tray">
-                  ↺ Clear
-                </MenuItem>
-                {!race && !st.solved && (
-                  <MenuItem onClick={toggleTodo} hint={onTodo ? undefined : 'Keep it until you solve it'}>
-                    📌 {onTodo ? 'Remove from to do' : 'Add to to do'}
+          {/* Everything but Snapshot and Clear lives in this menu, to keep the screen for the board.
+              Races have nothing else, so no menu. */}
+          {!race && (
+            <span className="menu-anchor">
+              <button className="btn ghost menu-button" onClick={() => setMenuOpen((m) => !m)} aria-label="More actions" aria-expanded={menuOpen}>
+                ⋯
+              </button>
+              {menuOpen && (
+                <div className="menu" role="menu" ref={menuRef} onClick={(e) => (e.target as Element).closest('button') && setMenuOpen(false)}>
+                  {!st.solved && (
+                    <>
+                      <MenuItem onClick={toggleTodo} hint={onTodo ? undefined : 'Keep it until you solve it'}>
+                        📌 {onTodo ? 'Remove from to do' : 'Add to to do'}
+                      </MenuItem>
+                      <hr />
+                    </>
+                  )}
+                  <MenuItem onClick={() => share(false)}>🔗 Copy link</MenuItem>
+                  <MenuItem onClick={showQr} hint="Scan it in Pips on another phone, no internet needed">
+                    ▦ Show QR code
                   </MenuItem>
-                )}
-                {!race && (
-                  <>
-                    <hr />
-                    <MenuItem onClick={() => share(false)}>🔗 Copy link</MenuItem>
-                    <MenuItem onClick={showQr} hint="Scan it in Pips on another phone, no internet needed">
-                      ▦ Show QR code
+                  {seedable && (
+                    <MenuItem onClick={() => share(true)} hint="Longer: the whole puzzle instead of its seed">
+                      Copy full puzzle link
                     </MenuItem>
-                    {seedable && (
-                      <MenuItem onClick={() => share(true)} hint="Longer: the whole puzzle instead of its seed">
-                        Copy full puzzle link
+                  )}
+                  <hr />
+                  {source !== 'local' && (
+                    <MenuItem onClick={save} disabled={savedState === 'saved'}>
+                      💾 {savedState === 'none' ? 'Save to My puzzles' : savedState === 'changed' ? 'Replace my saved copy' : 'Saved ✓'}
+                    </MenuItem>
+                  )}
+                  {onEdit ? (
+                    <MenuItem onClick={onEdit}>✏️ Edit</MenuItem>
+                  ) : (
+                    onRemix && (
+                      <MenuItem onClick={onRemix} hint="Open a copy in the editor">
+                        ✏️ Remix
                       </MenuItem>
-                    )}
-                    <hr />
-                    {source !== 'local' && (
-                      <MenuItem onClick={save} disabled={savedState === 'saved'}>
-                        💾 {savedState === 'none' ? 'Save to My puzzles' : savedState === 'changed' ? 'Replace my saved copy' : 'Saved ✓'}
+                    )
+                  )}
+                  {/* Daily puzzles are the same for everyone: no revealing the answer. */}
+                  {source !== 'daily' && (
+                    <>
+                      <hr />
+                      <MenuItem onClick={reveal} hint="Show the answer (doesn't count as solved)">
+                        👁 Reveal
                       </MenuItem>
-                    )}
-                    {onEdit ? (
-                      <MenuItem onClick={onEdit}>✏️ Edit</MenuItem>
-                    ) : (
-                      onRemix && (
-                        <MenuItem onClick={onRemix} hint="Open a copy in the editor">
-                          ✏️ Remix
-                        </MenuItem>
-                      )
-                    )}
-                    {/* Daily puzzles are the same for everyone: no revealing the answer. */}
-                    {source !== 'daily' && (
-                      <>
-                        <hr />
-                        <MenuItem onClick={reveal} hint="Show the answer (doesn't count as solved)">
-                          👁 Reveal
-                        </MenuItem>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
-          </span>
+                    </>
+                  )}
+                </div>
+              )}
+            </span>
+          )}
         </span>
+      </div>
+      <div className="play-actions">
+        <button className="btn ghost" onClick={takeSnapshot} disabled={st.solved || race?.locked} title="Save the current board so you can come back to it">
+          📸 Snapshot
+        </button>
+        <button className="btn ghost" onClick={clear} disabled={st.solved || race?.locked || (!placedCount && !shownSet.size)} title="Put all dominoes back in the tray (the timer keeps running)">
+          ↺ Clear
+        </button>
       </div>
 
       <div className="play-area">
