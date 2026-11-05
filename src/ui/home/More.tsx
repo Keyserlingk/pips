@@ -63,7 +63,6 @@ export function More({ go }: { go: (hash: string) => void }) {
         <span />
       </div>
       <section className="hero">
-        <p className="muted">Random puzzles at any level, play with friends, your history and your own puzzles.</p>
         <div className="quick">
           {PLAYABLE_LEVELS.map((d) => (
             <button key={d} className={`quick-card ${d}`} onClick={() => quick(d)} disabled={!!busy}>

@@ -144,7 +144,6 @@ export function DailyHome({ go }: { go: (hash: string) => void }) {
           🎲 More ways to play
         </button>
       </div>
-      <p className="muted small center">Random puzzles, play with friends, your history and your own puzzles.</p>
     </div>
   );
 }
