@@ -102,7 +102,7 @@ export function DailyHome({ go }: { go: (hash: string) => void }) {
     <div className="daily">
       <section className="hero">
         <h1>Today's puzzles</h1>
-        <p className="muted">{formatDay(date).replace(',', '')} · New ones at midnight</p>
+        <p className="muted">{formatDay(date).replace(',', '')} · New ones at midnight!</p>
       </section>
       <div className="quick">
         {PLAYABLE_LEVELS.map((level) => {
@@ -132,10 +132,6 @@ export function DailyHome({ go }: { go: (hash: string) => void }) {
         })}
       </div>
       <DailyTotal />
-      <p className="muted small center">
-        Puzzles are prepared on your device the first time you open them today (Rachel can take a little while on a
-        phone).
-      </p>
       <div className="row center more-entry">
         <button className="btn" onClick={() => go('#/more')}>
           🎲 More ways to play
