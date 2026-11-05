@@ -37,14 +37,19 @@ android {
         debug {
             applicationIdSuffix ".dev"
             versionNameSuffix "-dev"
+            // Phones (64-bit) and the emulator only, to keep the QR reader's native code small.
+            ndk { abiFilters 'arm64-v8a', 'x86_64' }
         }
         release {
             if (releaseKeystore) signingConfig signingConfigs.release
             // Phones only (the QR reader's native code is ~6 MB per processor type); debug builds
             // keep the emulator's x86 types too.
             ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // R8 drops library code the app never uses; Capacitor and the Google libraries
+            // bring the rules that keep what's only reached indirectly (plugins and the like).
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
