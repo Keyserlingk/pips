@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { NativeScan } from './NativeScan';
+import { pipsRoute } from './links';
 
 /*
  * Reads a Pips QR code with the camera and opens it, all on the device, so
@@ -6,17 +9,6 @@ import { useEffect, useRef, useState } from 'react';
  * this screen) rather than the browser's BarcodeDetector, which some Android
  * WebViews offer but which then finds nothing.
  */
-
-/** Routes a scanned link may open. */
-const ROUTES = ['s', 'p', 'g', 'play', 'duel'];
-
-/** The app route (#/...) in a scanned Pips link, or null for anything else. */
-export function pipsRoute(text: string): string | null {
-  const i = text.indexOf('#/');
-  if (i < 0 || !/^https?:\/\//.test(text)) return null;
-  const route = text.slice(i);
-  return ROUTES.includes(route.slice(2).split('/')[0]) ? route : null;
-}
 
 type Detect = (video: HTMLVideoElement) => Promise<string | null>;
 
@@ -43,7 +35,12 @@ async function makeDetector(): Promise<Detect> {
 type CameraCaps = MediaTrackCapabilities & { focusMode?: string[]; zoom?: { min: number; max: number; step: number }; pointsOfInterest?: unknown };
 const tune = (track: MediaStreamTrack, c: Record<string, unknown>) => track.applyConstraints({ advanced: [c as MediaTrackConstraintSet] }).catch(() => {});
 
+/** The Android app uses its native scanner; browsers use the camera through the page. */
 export function Scan({ go }: { go: (hash: string) => void }) {
+  return Capacitor.isNativePlatform() ? <NativeScan go={go} /> : <WebScan go={go} />;
+}
+
+function WebScan({ go }: { go: (hash: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const [caps, setCaps] = useState<CameraCaps | null>(null);

@@ -142,6 +142,13 @@ label.radio span { display: block; }
 .scan { display: flex; flex-direction: column; gap: 14px; max-width: 520px; margin: 0 auto; }
 .scan-view { position: relative; width: 100%; aspect-ratio: 1; border-radius: 18px; overflow: hidden; background: #000; }
 .scan-view video { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* App scanner: the native camera is behind the page, so the page goes see-through except the
+   scan screen's own panels (NativeScan.tsx). */
+html.native-scan, html.native-scan body, html.native-scan .app { background: transparent !important; }
+html.native-scan .top, html.native-scan .update-banner { visibility: hidden; }
+.scan.native .scan-view { background: transparent; }
+.scan.native .scan-frame { box-shadow: 0 0 0 999px rgb(0 0 0 / 0.45); }
+.scan-panel { background: var(--surface); border-radius: 16px; padding: 10px 14px; }
 .scan-zoom { display: flex; align-items: center; gap: 10px; }
 .scan-zoom input { flex: 1; }
 .scan-frame { position: absolute; inset: 18%; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 0 0 999px rgb(0 0 0 / 0.35); }

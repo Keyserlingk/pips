@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import qrcode from 'qrcode-generator';
 import jsQR from 'jsqr';
-import { pipsRoute } from './Scan';
+import { pipsRoute } from './links';
 
 /** Draws a QR code the way QrCode does (with a quiet zone), as RGBA pixels. */
 function render(text: string, px = 4) {
