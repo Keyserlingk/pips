@@ -9,6 +9,7 @@ import { runEngine } from '../../engine/client';
 import { levelClass, levelLabel } from '../../model/levels';
 import { Board, type BoardDomino, boardFrame, boardPoint, cellAt, cellPixels } from '../board/Board';
 import { DominoShape, S } from '../board/DominoShape';
+import { QrCode } from '../qr/QrCode';
 import { type Parked, type Rect, dropRect, findSpot, inside, parkedRect, turned, within } from './parking';
 
 const fresh = (): PlayState => ({ placed: {}, tray: {}, elapsed: 0, solved: false });
@@ -406,6 +407,13 @@ export function Play({
     return () => removeEventListener('pointerdown', close);
   }, [shareMenu]);
 
+  // The QR code holds the same link Share copies: scanned in Pips, it opens without internet.
+  const [qr, setQr] = useState<string | null>(null);
+  const showQr = async () => {
+    setShareMenu(false);
+    setQr(seedable ? seedUrl(puzzle.origin!) : await shareUrl(puzzle));
+  };
+
   const share = async (full: boolean) => {
     setShareMenu(false);
     try {
@@ -459,22 +467,26 @@ export function Play({
               <button className="btn ghost" onClick={() => share(false)}>
                 Share
               </button>
-              {seedable && (
-                <button
-                  className="btn ghost share-more"
-                  onClick={() => setShareMenu((m) => !m)}
-                  aria-label="More ways to share"
-                  aria-expanded={shareMenu}
-                >
-                  ▾
-                </button>
-              )}
+              <button
+                className="btn ghost share-more"
+                onClick={() => setShareMenu((m) => !m)}
+                aria-label="More ways to share"
+                aria-expanded={shareMenu}
+              >
+                ▾
+              </button>
               {shareMenu && (
                 <div className="share-menu" role="menu" ref={shareMenuRef}>
-                  <button role="menuitem" onClick={() => share(true)}>
-                    Copy full puzzle link
-                    <span className="muted small">Longer, but holds the whole puzzle instead of the seed it was made from</span>
+                  <button role="menuitem" onClick={showQr}>
+                    Show QR code
+                    <span className="muted small">Scan it in Pips on another phone, no internet needed</span>
                   </button>
+                  {seedable && (
+                    <button role="menuitem" onClick={() => share(true)}>
+                      Copy full puzzle link
+                      <span className="muted small">Longer, but holds the whole puzzle instead of the seed it was made from</span>
+                    </button>
+                  )}
                 </div>
               )}
             </span>
@@ -604,6 +616,20 @@ export function Play({
 
       {drag && <DragGhost {...drag} dominoes={puzzle.dominoes} />}
       {toast && <div className="toast">{toast}</div>}
+
+      {qr && (
+        <div className="modal-backdrop" onClick={() => setQr(null)}>
+          <div className="modal qr-modal" onClick={(e) => e.stopPropagation()}>
+            <QrCode text={qr} label={`QR code for ${puzzle.title || 'this puzzle'}`} />
+            <p className="muted small">
+              On the other phone: open Pips, tap <strong>📷 Scan QR code</strong> and point it here. Works without internet.
+            </p>
+            <button className="btn" onClick={() => setQr(null)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
 
       {st.solved && !dismissed && !race && (
         <div className="modal-backdrop">

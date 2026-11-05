@@ -4,6 +4,7 @@ import { getPuzzle, loadQuick, loadTheme, saveRemix, saveTheme } from './model/s
 import { decodeLegacy, decodeShare } from './model/serialize';
 import { THEMES } from './styles/themes';
 import { Home, WAIT } from './ui/home/Home';
+import { Scan } from './ui/qr/Scan';
 import { Play } from './ui/play/Play';
 import { Editor } from './ui/editor/Editor';
 import { Duel, DuelStart } from './ui/duel/Duel';
@@ -57,7 +58,9 @@ export function App() {
     );
 
   let page: JSX.Element;
-  if (parts[0] === 's') {
+  if (parts[0] === 'scan') {
+    page = <Scan go={go} />;
+  } else if (parts[0] === 's') {
     page = <SeededPlay key={parts[1]} code={parts[1] ?? ''} onHome={home} render={(p) => play(p, 'shared')} />;
   } else if (parts[0] === 'p') {
     page = <SharedPlay key={parts[1]} code={parts[1] ?? ''} render={(p) => play(p, 'shared')} />;

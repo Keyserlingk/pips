@@ -74,6 +74,9 @@ export function Home({ go }: { go: (hash: string) => void }) {
           <button className="btn ghost" onClick={() => go('#/ghost')}>
             👻 Ghost challenge
           </button>
+          <button className="btn ghost" onClick={() => go('#/scan')} title="Open a puzzle from a QR code, without internet">
+            📷 Scan QR code
+          </button>
         </div>
         <label className="check extras-toggle">
           <input type="checkbox" checked={withExtras} onChange={(e) => setWithExtras(e.target.checked)} />

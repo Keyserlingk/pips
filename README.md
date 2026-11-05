@@ -27,6 +27,8 @@ Other scripts: `npm test` (engine tests), `npm run build` (static build in `dist
   seed, fingerprint); the receiver regenerates the puzzle. **Share ▾ → Copy full puzzle link** sends the
   whole puzzle instead. Bump `GENERATOR_VERSION` in `src/engine/version.ts` whenever the generator starts
   making different puzzles from the same seed (a test in `src/model/seedLink.test.ts` catches this).
+- **Share ▾ → Show QR code** shows the same link as a QR code. **📷 Scan QR code** on the home screen reads one
+  with the camera and opens the puzzle on the device, so the app can pass puzzles on without internet.
 
 ## Project layout
 
