@@ -32,6 +32,12 @@ android {
         }
     }
     buildTypes {
+        // A separate app next to the release one (its own name in src/debug, and its own
+        // saved progress). The "-dev" version also keeps the update banner from offering releases.
+        debug {
+            applicationIdSuffix ".dev"
+            versionNameSuffix "-dev"
+        }
         release {
             if (releaseKeystore) signingConfig signingConfigs.release
             minifyEnabled false

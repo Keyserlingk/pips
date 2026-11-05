@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!-- Debug builds are a separate app ("Pips Dev"), so they install next to the release app. -->
+<resources>
+    <string name="app_name">Pips Dev</string>
+    <string name="title_activity_main">Pips Dev</string>
+    <color name="dev_icon_background">#D9822B</color>
+</resources>

@@ -110,7 +110,9 @@ At most once a day the app asks GitHub for the latest release and, if its tag (`
 the installed version, offers it in a banner (Download opens the release page; Later hides it for a
 day). Development builds (`dev-…` versions) don't check.
 
-The APK ends up in `android/app/build/outputs/apk/debug/app-debug.apk`. Changes to the site reach
+The APK ends up in `android/app/build/outputs/apk/debug/app-debug.apk`. It is a separate app,
+**Pips Dev** (orange icon, app ID `io.github.keyserlingk.pips.dev`), so it installs next to the release
+app instead of over it. It keeps its own progress and never shows the update banner. Changes to the site reach
 the app only when it is rebuilt and reinstalled. The icon and splash screen sources are in
 `assets/` (regenerate with `npx @capacitor/assets generate --android`).
 
