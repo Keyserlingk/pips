@@ -5,6 +5,7 @@ const QUICK = 'pips.quick';
 const REMIX = 'pips.remix';
 const PROGRESS = 'pips.progress.';
 const THEME = 'pips.theme';
+const UPDATE = 'pips.update';
 
 function read<T>(k: string): T | null {
   try {
@@ -91,3 +92,12 @@ export const saveName = (name: string) => write('pips.name', name);
 
 export const loadTheme = () => read<string>(THEME) ?? 'classic';
 export const saveTheme = (t: string) => write(THEME, t);
+
+/** The app's update check: when it last asked, what it found, and when the player said "Later". */
+export interface UpdateState {
+  checkedAt: number;
+  latest: { version: string; url: string } | null;
+  dismissedAt?: number;
+}
+export const loadUpdateState = () => read<UpdateState>(UPDATE);
+export const saveUpdateState = (s: UpdateState) => write(UPDATE, s);

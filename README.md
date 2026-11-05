@@ -96,6 +96,10 @@ npm run android:build     # build the site, copy it into android/, build a debug
 npm run android:install   # install it on a phone connected with USB debugging on
 ```
 
+At most once a day the app asks GitHub for the latest release and, if its tag (`v1.2`) is newer than
+the installed version, offers it in a banner (Download opens the release page; Later hides it for a
+day). Development builds (`dev-…` versions) don't check.
+
 The APK ends up in `android/app/build/outputs/apk/debug/app-debug.apk`. Changes to the site reach
 the app only when it is rebuilt and reinstalled. The icon and splash screen sources are in
 `assets/` (regenerate with `npx @capacitor/assets generate --android`).

@@ -5,6 +5,7 @@ import { decodeLegacy, decodeShare } from './model/serialize';
 import { THEMES } from './styles/themes';
 import { Home, WAIT } from './ui/home/Home';
 import { Scan } from './ui/qr/Scan';
+import { UpdateBanner } from './ui/update/UpdateBanner';
 import { Play } from './ui/play/Play';
 import { Editor } from './ui/editor/Editor';
 import { Duel, DuelStart } from './ui/duel/Duel';
@@ -113,6 +114,7 @@ export function App() {
           </select>
         </label>
       </header>
+      <UpdateBanner />
       <main>{page}</main>
     </div>
   );
