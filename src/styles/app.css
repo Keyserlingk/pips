@@ -149,8 +149,6 @@ html.native-scan .top, html.native-scan .update-banner { visibility: hidden; }
 .scan.native .scan-view { background: transparent; }
 .scan.native .scan-frame { box-shadow: 0 0 0 999px rgb(0 0 0 / 0.45); }
 .scan-panel { background: var(--surface); border-radius: 16px; padding: 10px 14px; }
-.scan-zoom { display: flex; align-items: center; gap: 10px; }
-.scan-zoom input { flex: 1; }
 .scan-frame { position: absolute; inset: 18%; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 0 0 999px rgb(0 0 0 / 0.35); }
 /* App update offer (Android app only). */
 .update-banner {

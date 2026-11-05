@@ -32,7 +32,7 @@ async function makeDetector(): Promise<Detect> {
 }
 
 /** Camera features browsers offer on many phones but TypeScript doesn't describe yet. */
-type CameraCaps = MediaTrackCapabilities & { focusMode?: string[]; zoom?: { min: number; max: number; step: number }; pointsOfInterest?: unknown };
+type CameraCaps = MediaTrackCapabilities & { focusMode?: string[]; pointsOfInterest?: unknown };
 const tune = (track: MediaStreamTrack, c: Record<string, unknown>) => track.applyConstraints({ advanced: [c as MediaTrackConstraintSet] }).catch(() => {});
 
 /** The Android app uses its native scanner; browsers use the camera through the page. */
@@ -44,7 +44,6 @@ function WebScan({ go }: { go: (hash: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const trackRef = useRef<MediaStreamTrack | null>(null);
   const [caps, setCaps] = useState<CameraCaps | null>(null);
-  const [zoom, setZoom] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notPips, setNotPips] = useState(false);
   const goRef = useRef(go);
@@ -72,7 +71,6 @@ function WebScan({ go }: { go: (hash: string) => void }) {
       setCaps(c);
       // Many phone cameras keep one fixed focus unless asked to keep focusing.
       if (c.focusMode?.includes('continuous')) await tune(track, { focusMode: 'continuous' });
-      if (c.zoom) setZoom(c.zoom.min);
       const video = videoRef.current!;
       video.srcObject = stream;
       await video.play().catch(() => {});
@@ -104,11 +102,6 @@ function WebScan({ go }: { go: (hash: string) => void }) {
     if (caps.focusMode.includes('continuous')) setTimeout(() => tune(track, { focusMode: 'continuous' }), 1500);
   };
 
-  const changeZoom = (z: number) => {
-    setZoom(z);
-    if (trackRef.current) tune(trackRef.current, { zoom: z });
-  };
-
   return (
     <div className="scan">
       <div className="play-bar">
@@ -126,24 +119,11 @@ function WebScan({ go }: { go: (hash: string) => void }) {
             <video ref={videoRef} muted playsInline />
             <div className="scan-frame" />
           </div>
-          {caps?.zoom && zoom !== null && caps.zoom.max > caps.zoom.min && (
-            <label className="scan-zoom">
-              <span className="muted small">Zoom</span>
-              <input
-                type="range"
-                min={caps.zoom.min}
-                max={Math.min(caps.zoom.max, caps.zoom.min * 5)}
-                step={caps.zoom.step || 0.1}
-                value={zoom}
-                onChange={(e) => changeZoom(Number(e.target.value))}
-              />
-            </label>
-          )}
           <p className="muted small center">
             {notPips ? "That QR code isn't a Pips puzzle." : 'Point the camera at a Pips QR code (Share ▾ → Show QR code). No internet needed.'}
           </p>
           <p className="muted small center">
-            Blurry? Hold the phone a little further away{caps?.zoom ? ' and zoom in' : ''}
+            Blurry? Hold the phone a little further away
             {caps?.focusMode?.includes('single-shot') ? ', or tap the picture to focus' : ''}.
           </p>
         </>
