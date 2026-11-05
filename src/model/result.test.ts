@@ -23,13 +23,13 @@ describe('result', () => {
     expect(duration(44, true)).toBe('44s');
   });
 
-  it('shares a random puzzle with its date, level, time, emoji and link', () => {
-    expect(resultText(seeded, 224, 'https://x/#/s/1', new Date(2026, 10, 5))).toBe('erkpips 5/11/26 easy in 3min 44s 🟢\nhttps://x/#/s/1');
+  it('shares a random puzzle with its level, time, emoji and link, but no date', () => {
+    expect(resultText(seeded, 224, 'https://x/#/s/1')).toBe('erkpips easy in 3min 44s 🟢\nhttps://x/#/s/1');
   });
 
   it('dates a daily puzzle by its own day, and says it is the daily', () => {
     const daily = puzzle({ id: 'daily-2026-11-05-expert', difficulty: 'expert' });
-    expect(resultText(daily, 61, null, new Date(2026, 10, 7))).toBe('erkpips 5/11/26 daily rachel in 1min 1s ⚫');
+    expect(resultText(daily, 61, null)).toBe('erkpips 5/11/26 daily rachel in 1min 1s ⚫');
   });
 
   it('names the puzzle in the message', () => {
