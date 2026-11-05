@@ -102,10 +102,7 @@ export function DailyHome({ go }: { go: (hash: string) => void }) {
     <div className="daily">
       <section className="hero">
         <h1>Today's puzzles</h1>
-        <p className="muted">
-          {formatDay(date)} · the same four for everyone, new ones at midnight. Place every domino so each coloured
-          region meets its condition.
-        </p>
+        <p className="muted">{formatDay(date).replace(',', '')} · New ones at midnight</p>
       </section>
       <div className="quick">
         {PLAYABLE_LEVELS.map((level) => {
