@@ -25,8 +25,8 @@ async function makeDetector(): Promise<Detect> {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
   return async (video) => {
-    // Scaled down: plenty for a QR code filling part of the view, and much faster.
-    const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
+    // Scaled down for speed, but sharp enough for the dense codes of whole puzzles.
+    const scale = Math.min(1, 800 / Math.max(video.videoWidth, video.videoHeight));
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);

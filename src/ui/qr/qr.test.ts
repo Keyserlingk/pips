@@ -5,7 +5,7 @@ import { pipsRoute } from './Scan';
 
 /** Draws a QR code the way QrCode does (with a quiet zone), as RGBA pixels. */
 function render(text: string, px = 4) {
-  const qr = qrcode(0, 'M');
+  const qr = qrcode(0, text.length > 100 ? 'L' : 'M');
   qr.addData(text);
   qr.make();
   const n = qr.getModuleCount() + 8;
@@ -23,10 +23,12 @@ function render(text: string, px = 4) {
 describe('QR codes', () => {
   it.each([
     'https://keyserlingk.github.io/pips/#/s/1.e.1hdg1mp.1ha1kmh',
-    // A full puzzle link is much longer, and must still fit and read back.
+    // Full puzzle links (custom puzzles) are much longer, and must still fit and read back,
+    // even drawn small: 3 pixels per square.
     `https://keyserlingk.github.io/pips/#/p/z${'Ab9_-'.repeat(90)}`,
+    `https://keyserlingk.github.io/pips/#/p/z${'Ab9_-xQ'.repeat(120)}`,
   ])('read back what they were made from (%#)', (text) => {
-    const { data, size } = render(text);
+    const { data, size } = render(text, 3);
     expect(jsQR(data, size, size)?.data).toBe(text);
   });
 

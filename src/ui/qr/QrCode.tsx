@@ -4,7 +4,9 @@ import qrcode from 'qrcode-generator';
 /** A QR code for `text`, drawn dark on white whatever the theme, so cameras can read it. */
 export function QrCode({ text, label }: { text: string; label: string }) {
   const { size, path } = useMemo(() => {
-    const qr = qrcode(0, 'M');
+    // Long links (whole puzzles) use the lowest error correction: a code on a screen doesn't
+    // get damaged, and fewer, bigger squares scan more easily.
+    const qr = qrcode(0, text.length > 100 ? 'L' : 'M');
     qr.addData(text);
     qr.make();
     const n = qr.getModuleCount();

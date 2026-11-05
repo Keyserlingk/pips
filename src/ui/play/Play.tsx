@@ -3,13 +3,13 @@ import type { Cell, Puzzle } from '../../model/types';
 import { DIRS, add, constraintRule, evaluate, key, newId, ruleKey, sameCell } from '../../model/cells';
 import { type Orient, type PlayState, type Snapshot, getPuzzle, loadProgress, savePuzzle, saveProgress } from '../../model/storage';
 import { samePuzzle, shareUrl } from '../../model/serialize';
-import { canShareSeed, seedUrl } from '../../model/seedLink';
+import { canShareSeed, puzzleLink } from '../../model/seedLink';
 import { GENERATOR_VERSION } from '../../engine/version';
 import { runEngine } from '../../engine/client';
 import { levelClass, levelLabel } from '../../model/levels';
 import { Board, type BoardDomino, boardFrame, boardPoint, cellAt, cellPixels } from '../board/Board';
 import { DominoShape, S } from '../board/DominoShape';
-import { QrCode } from '../qr/QrCode';
+import { QrModal } from '../qr/QrModal';
 import { type Parked, type Rect, dropRect, findSpot, inside, parkedRect, turned, within } from './parking';
 
 const fresh = (): PlayState => ({ placed: {}, tray: {}, elapsed: 0, solved: false });
@@ -411,13 +411,13 @@ export function Play({
   const [qr, setQr] = useState<string | null>(null);
   const showQr = async () => {
     setShareMenu(false);
-    setQr(seedable ? seedUrl(puzzle.origin!) : await shareUrl(puzzle));
+    setQr(await puzzleLink(puzzle));
   };
 
   const share = async (full: boolean) => {
     setShareMenu(false);
     try {
-      await navigator.clipboard.writeText(seedable && !full ? seedUrl(puzzle.origin!) : await shareUrl(puzzle));
+      await navigator.clipboard.writeText(full ? await shareUrl(puzzle) : await puzzleLink(puzzle));
       flash(seedable && full ? 'Full link copied' : 'Link copied');
     } catch {
       flash('Could not copy link');
@@ -617,19 +617,7 @@ export function Play({
       {drag && <DragGhost {...drag} dominoes={puzzle.dominoes} />}
       {toast && <div className="toast">{toast}</div>}
 
-      {qr && (
-        <div className="modal-backdrop" onClick={() => setQr(null)}>
-          <div className="modal qr-modal" onClick={(e) => e.stopPropagation()}>
-            <QrCode text={qr} label={`QR code for ${puzzle.title || 'this puzzle'}`} />
-            <p className="muted small">
-              On the other phone: open Pips, tap <strong>📷 Scan QR code</strong> and point it here. Works without internet.
-            </p>
-            <button className="btn" onClick={() => setQr(null)}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
+      {qr && <QrModal link={qr} title={puzzle.title} onClose={() => setQr(null)} />}
 
       {st.solved && !dismissed && !race && (
         <div className="modal-backdrop">

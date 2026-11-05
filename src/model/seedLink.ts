@@ -2,6 +2,8 @@ import type { Difficulty, Puzzle, SeedOrigin } from './types';
 import { DEFAULT_OPTIONS, EXTRA_KINDS } from './types';
 import { levelLabel } from './levels';
 import { pageUrl } from './site';
+import { shareUrl } from './serialize';
+import { GENERATOR_VERSION } from '../engine/version';
 
 /*
  * Seed links: a random puzzle shared as the recipe that made it (generator
@@ -52,6 +54,9 @@ export function decodeSeed(code: string): SeedOrigin | null {
 export const canShareSeed = (p: Puzzle, version: number) => !!p.origin && p.origin.v === version && fingerprint(p) === p.origin.fp;
 
 export const seedUrl = (o: SeedOrigin) => `${pageUrl()}#/s/${encodeSeed(o)}`;
+
+/** The link to share: the short seed link when there is one, else the full puzzle. */
+export const puzzleLink = async (p: Puzzle) => (canShareSeed(p, GENERATOR_VERSION) ? seedUrl(p.origin!) : shareUrl(p));
 
 /** A generated random puzzle, remembering its recipe. The id comes from the recipe, so progress survives reloads. */
 export function randomPuzzle(

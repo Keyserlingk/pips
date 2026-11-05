@@ -3,12 +3,13 @@ import type { Difficulty, Puzzle } from '../../model/types';
 import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
 import { solvedToday } from '../daily/Daily';
 import { deletePuzzle, loadLibrary, saveProgress, savePuzzle, saveQuick } from '../../model/storage';
-import { isPuzzle, shareUrl } from '../../model/serialize';
+import { isPuzzle } from '../../model/serialize';
+import { QrModal } from '../qr/QrModal';
 import { newId } from '../../model/cells';
 import { runEngine } from '../../engine/client';
 import { randomSeed } from '../../engine/rng';
 import { GENERATOR_VERSION } from '../../engine/version';
-import { randomPuzzle, seedOptions } from '../../model/seedLink';
+import { puzzleLink, randomPuzzle, seedOptions } from '../../model/seedLink';
 
 /** Shown while the slower levels generate (no time limit, so they can be shared as seed links). */
 export const WAIT: Partial<Record<Difficulty, string>> = { hard: ' (can take a few seconds)', expert: ' (can take up to a minute)' };
@@ -18,6 +19,7 @@ export function Home({ go }: { go: (hash: string) => void }) {
   const [busy, setBusy] = useState<Difficulty | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [withExtras, setWithExtras] = useState(false);
+  const [qr, setQr] = useState<{ link: string; title: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const quick = (difficulty: Difficulty) => {
@@ -125,8 +127,11 @@ export function Home({ go }: { go: (hash: string) => void }) {
                   <button className="btn ghost" onClick={() => go(`#/edit/${p.id}`)}>
                     Edit
                   </button>
-                  <button className="btn ghost" onClick={async () => navigator.clipboard?.writeText(await shareUrl(p))}>
+                  <button className="btn ghost" onClick={async () => navigator.clipboard?.writeText(await puzzleLink(p))}>
                     Copy link
+                  </button>
+                  <button className="btn ghost" onClick={async () => setQr({ link: await puzzleLink(p), title: p.title })}>
+                    QR code
                   </button>
                   <button
                     className="btn ghost danger"
@@ -144,6 +149,7 @@ export function Home({ go }: { go: (hash: string) => void }) {
           </ul>
         )}
       </section>
+      {qr && <QrModal link={qr.link} title={qr.title} onClose={() => setQr(null)} />}
     </div>
   );
 }
