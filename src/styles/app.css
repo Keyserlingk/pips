@@ -117,6 +117,20 @@ label.radio span { display: block; }
 .tray-domino:hover { transform: scale(1.05); }
 .tray-domino.h svg { width: 80px; height: 40px; display: block; }
 .tray-domino.v svg { width: 40px; height: 80px; display: block; }
+/* Share: short seed link by default, the full puzzle link from the ▾ menu. */
+.share-split { position: relative; display: inline-flex; gap: 3px; }
+.share-more { padding-left: 10px; padding-right: 10px; }
+.share-menu {
+  position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); z-index: 20;
+  width: max-content; max-width: min(260px, calc(100vw - 32px));
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 6px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.15);
+}
+.share-menu button {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; border: 0; background: none;
+  color: var(--text); font: inherit; font-weight: 700; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+}
+.share-menu button:hover { background: var(--bg); }
+.share-menu .small { font-weight: 400; }
 .hint { text-align: center; color: var(--muted); font-size: 0.85rem; margin: 6px 0 0; }
 .drag-ghost { position: fixed; pointer-events: none; z-index: 50; filter: drop-shadow(0 8px 12px rgb(0 0 0 / 0.25)); }
 

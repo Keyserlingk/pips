@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
-import { DEFAULT_OPTIONS, EXTRA_KINDS } from '../../model/types';
 import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
 import { solvedToday } from '../daily/Daily';
 import { deletePuzzle, loadLibrary, saveProgress, savePuzzle, saveQuick } from '../../model/storage';
@@ -8,38 +7,28 @@ import { isPuzzle, shareUrl } from '../../model/serialize';
 import { newId } from '../../model/cells';
 import { runEngine } from '../../engine/client';
 import { randomSeed } from '../../engine/rng';
+import { GENERATOR_VERSION } from '../../engine/version';
+import { randomPuzzle, seedOptions } from '../../model/seedLink';
 
-/** Shown while the slower levels generate. */
-const WAIT: Partial<Record<Difficulty, string>> = { expert: ' (up to 10 s)' };
+/** Shown while the slower levels generate (no time limit, so they can be shared as seed links). */
+export const WAIT: Partial<Record<Difficulty, string>> = { hard: ' (can take a few seconds)', expert: ' (can take up to a minute)' };
 
 export function Home({ go }: { go: (hash: string) => void }) {
   const [library, setLibrary] = useState<Puzzle[]>(loadLibrary);
   const [busy, setBusy] = useState<Difficulty | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [withExtras, setWithExtras] = useState(false);
-  const options = { ...DEFAULT_OPTIONS, extras: withExtras ? EXTRA_KINDS.map((k) => k.id) : [] };
   const fileRef = useRef<HTMLInputElement>(null);
 
   const quick = (difficulty: Difficulty) => {
     setBusy(difficulty);
     setError(null);
-    const opts = { ...options, maxPip: 6 as const };
-    runEngine('quick', { ...opts, difficulty, seed: randomSeed() })
+    // Generated from a recorded seed without time limits, so it can be shared as a short seed link.
+    const recipe = { v: GENERATOR_VERSION, level: difficulty, seed: randomSeed(), extras: withExtras };
+    runEngine('quick', seedOptions(recipe))
       .promise.then((res) => {
         if (!res.ok) return setError(res.error);
-        const p: Puzzle = {
-          version: 1,
-          id: `quick-${newId()}`,
-          title: `Random ${levelLabel(difficulty)}`,
-          difficulty,
-          width: res.width,
-          height: res.height,
-          cells: res.cells,
-          regions: res.regions,
-          dominoes: res.dominoes,
-          solution: res.solution,
-          options: opts,
-        };
+        const p = randomPuzzle(res, recipe);
         saveQuick(p);
         saveProgress(p.id, null);
         go('#/play/quick');

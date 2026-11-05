@@ -65,6 +65,21 @@ export type Puzzle = {
   dominoes: Domino[];
   solution?: Placement[];
   options: PuzzleOptions;
+  /** How a random puzzle was generated, so it can be shared as a short seed link. */
+  origin?: SeedOrigin;
+};
+
+/** A random puzzle's recipe: regenerating with these gives the same puzzle (see seedLink.ts). */
+export type SeedOrigin = {
+  /** GENERATOR_VERSION that made it. */
+  v: number;
+  /** The level asked for. */
+  level: Difficulty;
+  seed: number;
+  /** With the extra constraint kinds. */
+  extras: boolean;
+  /** Fingerprint of the puzzle, to check a regenerated one matches. */
+  fp: string;
 };
 
 export const NUM_REGION_COLORS = 8;

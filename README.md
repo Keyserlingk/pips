@@ -23,6 +23,10 @@ Other scripts: `npm test` (engine tests), `npm run build` (static build in `dist
   - *My regions & constraints* – searches for a domino set that satisfies your rules.
 - Options: double-six or double-nine set, allow duplicate dominoes, require a unique solution.
 - Puzzles are stored in the browser (`localStorage`); share them with **Copy link** or **Export JSON**.
+- Random puzzles are shared as a short **seed link** (`#/s/1.h.2k9f8a.1x7k2q`: generator version, level,
+  seed, fingerprint); the receiver regenerates the puzzle. **Share ▾ → Copy full puzzle link** sends the
+  whole puzzle instead. Bump `GENERATOR_VERSION` in `src/engine/version.ts` whenever the generator starts
+  making different puzzles from the same seed (a test in `src/model/seedLink.test.ts` catches this).
 
 ## Project layout
 

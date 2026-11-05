@@ -3,7 +3,7 @@ import type { Puzzle } from './model/types';
 import { getPuzzle, loadQuick, loadTheme, saveRemix, saveTheme } from './model/storage';
 import { decodeLegacy, decodeShare } from './model/serialize';
 import { THEMES } from './styles/themes';
-import { Home } from './ui/home/Home';
+import { Home, WAIT } from './ui/home/Home';
 import { Play } from './ui/play/Play';
 import { Editor } from './ui/editor/Editor';
 import { Duel, DuelStart } from './ui/duel/Duel';
@@ -13,6 +13,9 @@ import { isDateKey } from './model/daily';
 import { PLAYABLE_LEVELS } from './model/levels';
 import type { Difficulty } from './model/types';
 import { normaliseCode } from './duel/protocol';
+import { decodeSeed, randomPuzzle, seedOptions } from './model/seedLink';
+import { GENERATOR_VERSION } from './engine/version';
+import { runEngine } from './engine/client';
 
 function useHash() {
   const [hash, setHash] = useState(location.hash || '#/');
@@ -54,7 +57,9 @@ export function App() {
     );
 
   let page: JSX.Element;
-  if (parts[0] === 'p') {
+  if (parts[0] === 's') {
+    page = <SeededPlay key={parts[1]} code={parts[1] ?? ''} onHome={home} render={(p) => play(p, 'shared')} />;
+  } else if (parts[0] === 'p') {
     page = <SharedPlay key={parts[1]} code={parts[1] ?? ''} render={(p) => play(p, 'shared')} />;
   } else if (parts[0] === 'play') {
     if (parts[1] === 'quick') page = play(loadQuick(), 'quick');
@@ -122,6 +127,45 @@ function SharedPlay({ code, render }: { code: string; render: (p: Puzzle | null)
   }, [code]);
   if (puzzle === undefined) return <p className="muted">Loading puzzle…</p>;
   return render(puzzle);
+}
+
+/** Seed links are regenerated here, then checked against the fingerprint they carry. */
+function SeededPlay({ code, onHome, render }: { code: string; onHome: () => void; render: (p: Puzzle) => JSX.Element }) {
+  const [state, setState] = useState<Puzzle | string | null>(null);
+  useEffect(() => {
+    const link = decodeSeed(code);
+    if (!link) return setState('That puzzle link is broken. Ask for a new one.');
+    if (link.v > GENERATOR_VERSION) return setState('This link was made with a newer version of Pips. Reload the page or update the app, then try again.');
+    // Older versions: a newer generator would make a different puzzle. If one ever exists, keep the old
+    // generator around and pick it by version here.
+    if (link.v < GENERATOR_VERSION) return setState('This link was made with an older version of Pips and can no longer be opened.');
+    let live = true;
+    const job = runEngine('quick', seedOptions(link));
+    job.promise.then(
+      (res) => {
+        if (!live) return;
+        if (!res.ok) return setState('Could not recreate this puzzle. Ask for the full link instead.');
+        const p = randomPuzzle(res, link);
+        setState(p.origin!.fp === link.fp ? p : 'This puzzle came out differently here than for the sender. Ask for the full link instead.');
+      },
+      () => live && setState('Could not recreate this puzzle. Ask for the full link instead.'),
+    );
+    return () => {
+      live = false;
+      job.cancel();
+    };
+  }, [code]);
+  if (state === null) return <p className="muted">Generating puzzle…{WAIT[decodeSeed(code)?.level ?? 'easy'] ?? ''}</p>;
+  if (typeof state === 'string')
+    return (
+      <div className="panel">
+        <p>{state}</p>
+        <button className="btn" onClick={onHome}>
+          Home
+        </button>
+      </div>
+    );
+  return render(state);
 }
 
 function NotFound({ onHome }: { onHome: () => void }) {

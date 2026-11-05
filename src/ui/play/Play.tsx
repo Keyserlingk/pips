@@ -3,6 +3,8 @@ import type { Cell, Puzzle } from '../../model/types';
 import { DIRS, add, constraintRule, evaluate, key, newId, ruleKey, sameCell } from '../../model/cells';
 import { type Orient, type PlayState, type Snapshot, getPuzzle, loadProgress, savePuzzle, saveProgress } from '../../model/storage';
 import { samePuzzle, shareUrl } from '../../model/serialize';
+import { canShareSeed, seedUrl } from '../../model/seedLink';
+import { GENERATOR_VERSION } from '../../engine/version';
 import { runEngine } from '../../engine/client';
 import { levelClass, levelLabel } from '../../model/levels';
 import { Board, type BoardDomino, boardFrame, boardPoint, cellAt, cellPixels } from '../board/Board';
@@ -385,10 +387,30 @@ export function Play({
     setDismissed(false);
   };
 
-  const share = async () => {
+  // Random puzzles go out as a short seed link unless the full puzzle is asked for.
+  const seedable = canShareSeed(puzzle, GENERATOR_VERSION);
+  const [shareMenu, setShareMenu] = useState(false);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
+  // The menu is centred under the button; nudge it back inside the screen near an edge.
+  useLayoutEffect(() => {
+    const el = shareMenuRef.current;
+    if (!el) return;
+    el.style.marginLeft = '0px';
+    const r = el.getBoundingClientRect();
+    el.style.marginLeft = `${Math.max(16 - r.left, 0) - Math.max(r.right - (innerWidth - 16), 0)}px`;
+  }, [shareMenu]);
+  useEffect(() => {
+    if (!shareMenu) return;
+    const close = (e: PointerEvent) => !(e.target as Element).closest('.share-split') && setShareMenu(false);
+    addEventListener('pointerdown', close);
+    return () => removeEventListener('pointerdown', close);
+  }, [shareMenu]);
+
+  const share = async (full: boolean) => {
+    setShareMenu(false);
     try {
-      await navigator.clipboard.writeText(await shareUrl(puzzle));
-      flash('Link copied');
+      await navigator.clipboard.writeText(seedable && !full ? seedUrl(puzzle.origin!) : await shareUrl(puzzle));
+      flash(seedable && full ? 'Full link copied' : 'Link copied');
     } catch {
       flash('Could not copy link');
     }
@@ -433,9 +455,29 @@ export function Play({
                 Reveal
               </button>
             )}
-            <button className="btn ghost" onClick={share}>
-              Share
-            </button>
+            <span className="share-split">
+              <button className="btn ghost" onClick={() => share(false)}>
+                Share
+              </button>
+              {seedable && (
+                <button
+                  className="btn ghost share-more"
+                  onClick={() => setShareMenu((m) => !m)}
+                  aria-label="More ways to share"
+                  aria-expanded={shareMenu}
+                >
+                  ▾
+                </button>
+              )}
+              {shareMenu && (
+                <div className="share-menu" role="menu" ref={shareMenuRef}>
+                  <button role="menuitem" onClick={() => share(true)}>
+                    Copy full puzzle link
+                    <span className="muted small">Longer, but holds the whole puzzle instead of the seed it was made from</span>
+                  </button>
+                </div>
+              )}
+            </span>
             {source !== 'local' && (
               <button className="btn" onClick={save} disabled={savedState === 'saved'}>
                 {savedState === 'none' ? 'Save to My puzzles' : savedState === 'changed' ? 'Replace my saved copy' : 'Saved ✓'}
