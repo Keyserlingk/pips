@@ -413,32 +413,32 @@ export function Play({
 
   // Random puzzles go out as a short seed link unless the full puzzle is asked for.
   const seedable = canShareSeed(puzzle, GENERATOR_VERSION);
-  const [shareMenu, setShareMenu] = useState(false);
-  const shareMenuRef = useRef<HTMLDivElement>(null);
-  // The menu is centred under the button; nudge it back inside the screen near an edge.
+  // The ⋯ menu: choosing an item or tapping anywhere else closes it.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  // Keep it inside the screen on narrow phones.
   useLayoutEffect(() => {
-    const el = shareMenuRef.current;
+    const el = menuRef.current;
     if (!el) return;
-    el.style.marginLeft = '0px';
+    el.style.marginRight = '0px';
     const r = el.getBoundingClientRect();
-    el.style.marginLeft = `${Math.max(16 - r.left, 0) - Math.max(r.right - (innerWidth - 16), 0)}px`;
-  }, [shareMenu]);
+    el.style.marginRight = `${Math.min(r.left - 16, 0)}px`;
+  }, [menuOpen]);
   useEffect(() => {
-    if (!shareMenu) return;
-    const close = (e: PointerEvent) => !(e.target as Element).closest('.share-split') && setShareMenu(false);
+    if (!menuOpen) return;
+    const close = (e: PointerEvent) => !(e.target as Element).closest('.menu-anchor') && setMenuOpen(false);
     addEventListener('pointerdown', close);
     return () => removeEventListener('pointerdown', close);
-  }, [shareMenu]);
+  }, [menuOpen]);
+
 
   // The QR code holds the same link Share copies: scanned in Pips, it opens without internet.
   const [qr, setQr] = useState<string | null>(null);
   const showQr = async () => {
-    setShareMenu(false);
     setQr(await puzzleLink(puzzle));
   };
 
   const share = async (full: boolean) => {
-    setShareMenu(false);
     try {
       await navigator.clipboard.writeText(full ? await shareUrl(puzzle) : await puzzleLink(puzzle));
       flash(seedable && full ? 'Full link copied' : 'Link copied');
@@ -469,78 +469,68 @@ export function Play({
           <strong>{puzzle.title || 'Untitled'}</strong>
           {puzzle.difficulty && <span className={`pill ${levelClass(puzzle.difficulty)}`}>{levelLabel(puzzle.difficulty)}</span>}
         </div>
-        <span className="timer">{formatTime(st.elapsed)}</span>
-      </div>
-      <div className="play-actions">
-        <button className="btn ghost" onClick={takeSnapshot} disabled={st.solved || race?.locked} title="Save the current board so you can come back to it">
-          Snapshot
-        </button>
-        <button className="btn ghost" onClick={clear} disabled={st.solved || race?.locked || (!placedCount && !shownSet.size)} title="Put all dominoes back in the tray (the timer keeps running)">
-          Clear
-        </button>
-        {!race && !st.solved && (
-          <button
-            className={`btn ghost${onTodo ? ' on' : ''}`}
-            onClick={toggleTodo}
-            aria-pressed={onTodo}
-            title={onTodo ? 'Take it off your to-do list' : 'Keep it on your to-do list until you solve it'}
-          >
-            📌 {onTodo ? 'On to do' : 'To do'}
-          </button>
-        )}
-        {!race && (
-          <>
-            {/* Daily puzzles are the same for everyone: no revealing the answer. */}
-            {source !== 'daily' && (
-              <button className="btn ghost" onClick={reveal}>
-                Reveal
-              </button>
+        <span className="play-right">
+          <span className="timer">{formatTime(st.elapsed)}</span>
+          {/* Everything else lives in this menu, to keep the screen for the board. */}
+          <span className="menu-anchor">
+            <button className="btn ghost menu-button" onClick={() => setMenuOpen((m) => !m)} aria-label="More actions" aria-expanded={menuOpen}>
+              ⋯
+            </button>
+            {menuOpen && (
+              <div className="menu" role="menu" ref={menuRef} onClick={(e) => (e.target as Element).closest('button') && setMenuOpen(false)}>
+                <MenuItem onClick={takeSnapshot} disabled={st.solved || race?.locked} hint="Save the board to come back to">
+                  📸 Snapshot
+                </MenuItem>
+                <MenuItem onClick={clear} disabled={st.solved || race?.locked || (!placedCount && !shownSet.size)} hint="All dominoes back to the tray">
+                  ↺ Clear
+                </MenuItem>
+                {!race && !st.solved && (
+                  <MenuItem onClick={toggleTodo} hint={onTodo ? undefined : 'Keep it until you solve it'}>
+                    📌 {onTodo ? 'Remove from to do' : 'Add to to do'}
+                  </MenuItem>
+                )}
+                {!race && (
+                  <>
+                    <hr />
+                    <MenuItem onClick={() => share(false)}>🔗 Copy link</MenuItem>
+                    <MenuItem onClick={showQr} hint="Scan it in Pips on another phone, no internet needed">
+                      ▦ Show QR code
+                    </MenuItem>
+                    {seedable && (
+                      <MenuItem onClick={() => share(true)} hint="Longer: the whole puzzle instead of its seed">
+                        Copy full puzzle link
+                      </MenuItem>
+                    )}
+                    <hr />
+                    {source !== 'local' && (
+                      <MenuItem onClick={save} disabled={savedState === 'saved'}>
+                        💾 {savedState === 'none' ? 'Save to My puzzles' : savedState === 'changed' ? 'Replace my saved copy' : 'Saved ✓'}
+                      </MenuItem>
+                    )}
+                    {onEdit ? (
+                      <MenuItem onClick={onEdit}>✏️ Edit</MenuItem>
+                    ) : (
+                      onRemix && (
+                        <MenuItem onClick={onRemix} hint="Open a copy in the editor">
+                          ✏️ Remix
+                        </MenuItem>
+                      )
+                    )}
+                    {/* Daily puzzles are the same for everyone: no revealing the answer. */}
+                    {source !== 'daily' && (
+                      <>
+                        <hr />
+                        <MenuItem onClick={reveal} hint="Show the answer (doesn't count as solved)">
+                          👁 Reveal
+                        </MenuItem>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
             )}
-            <span className="share-split">
-              <button className="btn ghost" onClick={() => share(false)}>
-                Share
-              </button>
-              <button
-                className="btn ghost share-more"
-                onClick={() => setShareMenu((m) => !m)}
-                aria-label="More ways to share"
-                aria-expanded={shareMenu}
-              >
-                ▾
-              </button>
-              {shareMenu && (
-                <div className="share-menu" role="menu" ref={shareMenuRef}>
-                  <button role="menuitem" onClick={showQr}>
-                    Show QR code
-                    <span className="muted small">Scan it in Pips on another phone, no internet needed</span>
-                  </button>
-                  {seedable && (
-                    <button role="menuitem" onClick={() => share(true)}>
-                      Copy full puzzle link
-                      <span className="muted small">Longer, but holds the whole puzzle instead of the seed it was made from</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </span>
-            {source !== 'local' && (
-              <button className="btn" onClick={save} disabled={savedState === 'saved'}>
-                {savedState === 'none' ? 'Save to My puzzles' : savedState === 'changed' ? 'Replace my saved copy' : 'Saved ✓'}
-              </button>
-            )}
-            {onEdit ? (
-              <button className="btn ghost" onClick={onEdit}>
-                Edit
-              </button>
-            ) : (
-              onRemix && (
-                <button className="btn ghost" onClick={onRemix} title="Open a copy in the editor">
-                  Remix
-                </button>
-              )
-            )}
-          </>
-        )}
+          </span>
+        </span>
       </div>
 
       <div className="play-area">
@@ -689,6 +679,16 @@ export function Play({
         </div>
       )}
     </div>
+  );
+}
+
+/** One line in the ⋯ menu, with an optional explanation under it. Choosing it closes the menu. */
+function MenuItem({ onClick, disabled, hint, children }: { onClick: () => void; disabled?: boolean; hint?: string; children: React.ReactNode }) {
+  return (
+    <button role="menuitem" disabled={disabled} onClick={onClick}>
+      {children}
+      {hint && <span className="muted small">{hint}</span>}
+    </button>
   );
 }
 
