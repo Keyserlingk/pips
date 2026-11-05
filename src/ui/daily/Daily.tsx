@@ -63,10 +63,11 @@ export const dailyTimeToday = () => PLAYABLE_LEVELS.reduce((sum, l) => sum + dai
 
 // ------------------------------------------------------------- #/daily
 
-/** Total time on today's four puzzles (0:00 until one is started). */
+/** Total time on today's four puzzles; shown once one has been started. */
 function DailyTotal() {
   const solved = solvedToday();
   const seconds = dailyTimeToday();
+  if (!seconds) return null;
   const all = solved === PLAYABLE_LEVELS.length;
   return (
     <p className="daily-total center">
