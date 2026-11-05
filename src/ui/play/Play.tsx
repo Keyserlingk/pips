@@ -165,6 +165,23 @@ export function Play({
     return { values, occupant };
   }, [st.placed, puzzle]);
 
+  // The board lets the page scroll vertically (see app.css), except when a touch starts on a
+  // domino: that's a drag, so the touch must not scroll. Touch-action can't tell those apart,
+  // so a touchstart on a domino cancels the scroll instead.
+  const occupantRef = useRef(occupant);
+  occupantRef.current = occupant;
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onTouch = (e: TouchEvent) => {
+      const t = e.touches[0];
+      const c = t && cellAt(svg, puzzle.width, puzzle.height, t.clientX, t.clientY);
+      if (c && occupantRef.current.has(key(c))) e.preventDefault();
+    };
+    svg.addEventListener('touchstart', onTouch, { passive: false });
+    return () => svg.removeEventListener('touchstart', onTouch);
+  }, [puzzle]);
+
   const rules = useMemo(() => {
     const seen = new Map<string, string>();
     for (const reg of puzzle.regions) if (reg.constraint.kind !== 'none') seen.set(ruleKey(reg.constraint), constraintRule(reg.constraint));

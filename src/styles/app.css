@@ -104,6 +104,8 @@ label.radio span { display: block; }
 .play-actions { display: flex; gap: 8px; justify-content: center; margin: 10px 0 4px; }
 .play-area { display: flex; flex-direction: column; align-items: center; gap: 18px; }
 .play-area .board-wrap { width: 100%; }
+/* Swipes on the play board scroll the page; Play.tsx stops that only for touches on a domino. */
+.play-area .board { touch-action: pan-y; }
 /* The board plus room around it where dominoes can be set down anywhere. */
 .table { position: relative; width: 100%; max-width: 900px; padding: calc(var(--cell) * 0.6) 0; border-radius: 18px; }
 .table.dragging { outline: 2px dashed var(--border); outline-offset: -2px; }
