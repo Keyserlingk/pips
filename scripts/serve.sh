@@ -1,28 +1,43 @@
 #!/usr/bin/env bash
-# Starts a local server for trying the game, on this computer and on phones on
-# the same Wi-Fi (scan the QR code it prints). Ctrl+C stops it.
+# Starts a local server for trying the game. Only this computer can reach it,
+# unless you add --phone: then phones on the same Wi-Fi can too (scan the QR
+# code it prints), but not other networks such as VPNs. Ctrl+C stops it.
 #
-#   scripts/serve.sh              development server: reloads as you change the code
-#   scripts/serve.sh --preview    the production build, as it will be published
+#   scripts/serve.sh                    development server: reloads as you change the code
+#   scripts/serve.sh --preview          the production build, as it will be published
+#   scripts/serve.sh --phone            also reachable from phones on this Wi-Fi
+#   scripts/serve.sh --preview --phone
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
 mode=dev
-case "${1:-}" in
-  "") ;;
-  --preview) mode=preview ;;
-  *) sed -n '5,6p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
-esac
+phone=false
+for arg in "$@"; do
+  case "$arg" in
+    --preview) mode=preview ;;
+    --phone) phone=true ;;
+    *) sed -n '6,9p' "$0" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  esac
+done
 port=$([[ $mode == dev ]] && echo 5173 || echo 4173)
 
 [[ -d node_modules ]] || npm install
 
-# This computer's address on the local network, for phones.
-ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+host=localhost
+ip=""
+if $phone; then
+  # The Wi-Fi address only: listening on every network would also open the server to VPNs and the like.
+  wifi=$(ip -brief link 2>/dev/null | awk '$1 ~ /^wl/ && $2 == "UP" {print $1; exit}')
+  ip=$(ip -4 -brief addr show "${wifi:-none}" 2>/dev/null | awk '{sub(/\/.*/, "", $3); print $3}')
+  [[ -n "$ip" ]] || { echo "No Wi-Fi connection found: can't serve to phones." >&2; exit 1; }
+  host=$ip
+fi
+
 echo
-echo "  On this computer:  http://localhost:$port/"
+# With --phone the server listens on the Wi-Fi address only, so this computer uses that address too.
+echo "  On this computer:  http://$host:$port/"
 if [[ -n "$ip" ]]; then
-  echo "  On your phone:     http://$ip:$port/   (same Wi-Fi; scan this)"
+  echo "  On your phone:     http://$ip:$port/   (same Wi-Fi only; scan this)"
   node -e '
     const qr = require("qrcode-generator")(0, "L");
     qr.addData(process.argv[1]);
@@ -38,8 +53,8 @@ fi
 echo
 
 if [[ $mode == dev ]]; then
-  exec npx vite --host --port "$port" --strictPort
+  exec npx vite --host "$host" --port "$port" --strictPort
 else
   npm run build
-  exec npx vite preview --host --port "$port" --strictPort
+  exec npx vite preview --host "$host" --port "$port" --strictPort
 fi

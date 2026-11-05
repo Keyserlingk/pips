@@ -10,9 +10,12 @@ Requires Node 18+.
 npm install
 scripts/serve.sh             # or: npm run serve   → http://localhost:5173, reloads as you edit
 scripts/serve.sh --preview   # the production build, as it will be published (port 4173)
+scripts/serve.sh --phone     # also reachable from phones on this Wi-Fi (prints a QR code to scan)
 ```
 
-The script also prints the address for phones on the same Wi-Fi, with a QR code to scan. Ctrl+C stops it.
+Ctrl+C stops it. Without `--phone` only this computer can open it. With `--phone` it listens on the
+Wi-Fi address only, not on VPNs or other networks this computer is on; open it at that address here too.
+A development server is meant for trying things out: don't leave one running on networks you don't trust.
 
 Other scripts: `npm test` (engine tests), `npm run build` (static build in `dist/`), `npm run preview`.
 
