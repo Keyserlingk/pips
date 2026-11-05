@@ -107,3 +107,62 @@ day). Development builds (`dev-…` versions) don't check.
 The APK ends up in `android/app/build/outputs/apk/debug/app-debug.apk`. Changes to the site reach
 the app only when it is rebuilt and reinstalled. The icon and splash screen sources are in
 `assets/` (regenerate with `npx @capacitor/assets generate --android`).
+
+### Testing on the emulator
+
+A virtual Pixel 7 (`Pips_Phone`, Android 16) is set up:
+
+```bash
+~/Android/Sdk/emulator/emulator -avd Pips_Phone &   # start it (a phone window opens)
+npm run android:build && npm run android:install    # put the current code on it
+adb emu kill                                         # shut it down
+```
+
+`npm run dev` (http://localhost:5173) is quicker for trying changes in a browser; `npm run dev -- --host`
+also serves it to a phone on the same Wi-Fi.
+
+## Releasing the app
+
+```bash
+scripts/release.sh 1.2              # or: npm run release -- 1.2
+```
+
+That's all. The script checks everything first, shows the release notes, and asks before publishing.
+Then it pushes `main` if needed, creates the GitHub release `v1.2`, and waits (about 4 minutes) while
+the **Test and build Android app** workflow runs the tests, builds the APK, signs it, and attaches
+`pips-1.2.apk` to the release. Phones on an older version offer the update within about a day.
+
+- **Release notes:** by default the commit titles since the last release. To write your own, pass a
+  file: `scripts/release.sh 1.2 notes.md`. You can also edit them on GitHub afterwards.
+- **Try it first:** `scripts/release.sh 1.2 --dry-run` shows what would happen and changes nothing.
+- **Version numbers:** plain numbers (`1.2`, `1.10`, `2.0.1`), each higher than the last. The app
+  ignores anything else, and an older number would never be offered as an update.
+- **The script refuses when:** you're not on `main`, you have uncommitted changes, GitHub has commits you
+  haven't pulled (`git pull`), or the version already exists or isn't newer than the last one.
+
+### If the build fails
+
+The release then exists but has no APK. The script prints a link to the failed run; the log shows why
+(usually a failing test). Fix it, push, and either press **Re-run all jobs** on that page or delete the
+release and its tag on GitHub and run the script again. A re-run attaches the APK when it passes.
+
+### Every push to main
+
+The same workflow also runs on every push to `main` (tests plus a signed APK, kept under the run's
+**Artifacts** on GitHub as `pips-dev-<commit>.apk`), so you see a broken build before releasing.
+These dev builds never show the update banner.
+
+### The signing key
+
+Releases are signed with `~/keys/pips-release.jks` (alias `pips`), stored on GitHub as four encrypted
+secrets: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEY_ALIAS`, `ANDROID_KEYSTORE_PASSWORD`,
+`ANDROID_KEY_PASSWORD` (`gh secret list` shows they exist; values can't be read back).
+
+- **Keep the key file and its password backed up** (a password manager). Every update must be signed
+  with this same key: without it, no future version can install over the app.
+- **Never commit it.** `*.jks` and `*.keystore` are in `.gitignore`.
+- **New computer:** nothing to do for releases (GitHub holds the key). To put a key back on GitHub:
+  `base64 -w0 ~/keys/pips-release.jks | gh secret set ANDROID_KEYSTORE_BASE64`.
+- **v1.0 was signed with a different, temporary key.** Anyone still on 1.0 must uninstall it once before
+  installing a newer version (which clears progress saved in 1.0). Everyone on 1.1 or later updates
+  normally.
