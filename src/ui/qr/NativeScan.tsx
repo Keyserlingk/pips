@@ -53,7 +53,7 @@ export function NativeScan({ go }: { go: (hash: string) => void }) {
   return (
     <div className="scan native">
       <div className="play-bar scan-panel">
-        <button className="btn ghost" onClick={() => go('#/')}>
+        <button className="btn ghost" onClick={() => go('#/more')}>
           ← Back
         </button>
         <strong>Scan a puzzle</strong>

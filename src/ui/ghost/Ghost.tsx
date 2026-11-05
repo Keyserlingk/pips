@@ -457,7 +457,7 @@ export function GhostStart({ go }: { go: (hash: string) => void }) {
           >
             {phase === 'done' ? 'Make another' : 'Start'}
           </button>
-          <button className="btn ghost" onClick={() => go('#/')}>
+          <button className="btn ghost" onClick={() => go('#/more')}>
             Home
           </button>
         </div>
@@ -489,7 +489,7 @@ export function GhostChallenge({ code, go }: { code: string; go: (hash: string) 
     return (
       <section className="panel">
         <p>That challenge link doesn't work. Ask for a new one.</p>
-        <button className="btn" onClick={() => go('#/')}>
+        <button className="btn" onClick={() => go('#/more')}>
           Home
         </button>
       </section>
@@ -562,7 +562,7 @@ export function GhostChallenge({ code, go }: { code: string; go: (hash: string) 
               Start
             </button>
           )}
-          <button className="btn ghost" onClick={() => go('#/')}>
+          <button className="btn ghost" onClick={() => go('#/more')}>
             Home
           </button>
         </div>

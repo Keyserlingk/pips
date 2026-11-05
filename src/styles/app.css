@@ -337,6 +337,8 @@ html.native-scan .top, html.native-scan .update-banner { visibility: hidden; }
 .daily-button { font-size: 1.05rem; padding: 10px 22px; }
 .daily-count { margin-left: 8px; font-weight: 600; opacity: 0.75; font-size: 0.85rem; }
 .daily .quick { margin-top: 0; }
+.more-entry { margin-top: 18px; }
+.more-entry .btn { font-size: 1.1rem; padding: 12px 26px; }
 .daily-total { font-size: 1.05rem; margin: 14px 0 4px; }
 .quick-card.solved { outline: 3px solid var(--ok); outline-offset: 2px; }
 .quick-card:disabled { cursor: progress; }

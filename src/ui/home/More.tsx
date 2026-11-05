@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
 import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
-import { dailyTimeToday, solvedToday } from '../daily/Daily';
 import { MenuButton, MenuItem } from '../Menu';
 import { deletePuzzle, loadLibrary, loadTodo, saveProgress, savePuzzle, saveQuick } from '../../model/storage';
 import { isPuzzle } from '../../model/serialize';
@@ -12,19 +11,17 @@ import { randomSeed } from '../../engine/rng';
 import { GENERATOR_VERSION } from '../../engine/version';
 import { puzzleLink, randomPuzzle, seedOptions } from '../../model/seedLink';
 
-const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-
 /** Shown while the slower levels generate (no time limit, so they can be shared as seed links). */
 export const WAIT: Partial<Record<Difficulty, string>> = { hard: ' (can take a few seconds)', expert: ' (can take up to a minute)' };
 
-export function Home({ go }: { go: (hash: string) => void }) {
+/** "More ways to play": random puzzles, friends, history and your own puzzles. The start page is the daily puzzles. */
+export function More({ go }: { go: (hash: string) => void }) {
   const [library, setLibrary] = useState<Puzzle[]>(loadLibrary);
   const [busy, setBusy] = useState<Difficulty | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [withExtras, setWithExtras] = useState(false);
   const [qr, setQr] = useState<{ link: string; title: string } | null>(null);
   const todoCount = loadTodo().length;
-  const dailySeconds = dailyTimeToday();
   const fileRef = useRef<HTMLInputElement>(null);
 
   const quick = (difficulty: Difficulty) => {
@@ -58,17 +55,15 @@ export function Home({ go }: { go: (hash: string) => void }) {
 
   return (
     <div className="home">
+      <div className="play-bar">
+        <button className="btn ghost" onClick={() => go('#/')}>
+          ← Today
+        </button>
+        <strong>More ways to play</strong>
+        <span />
+      </div>
       <section className="hero">
-        <h1>Custom Pips</h1>
-        <p className="muted">Place every domino so that each coloured region meets its condition.</p>
-        <div className="row center daily-entry">
-          <button className="btn daily-button" onClick={() => go('#/daily')}>
-            📅 Daily{' '}
-            <span className="daily-count">
-              {solvedToday()}/4 today{dailySeconds > 0 && ` · ${formatTime(dailySeconds)}`}
-            </span>
-          </button>
-        </div>
+        <p className="muted">Random puzzles at any level, play with friends, your history and your own puzzles.</p>
         <div className="quick">
           {PLAYABLE_LEVELS.map((d) => (
             <button key={d} className={`quick-card ${d}`} onClick={() => quick(d)} disabled={!!busy}>

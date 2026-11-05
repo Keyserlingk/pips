@@ -3,7 +3,7 @@ import type { Puzzle } from './model/types';
 import { getPuzzle, loadQuick, loadTheme, saveRemix, saveTheme } from './model/storage';
 import { decodeLegacy, decodeShare } from './model/serialize';
 import { THEMES } from './styles/themes';
-import { Home, WAIT } from './ui/home/Home';
+import { More, WAIT } from './ui/home/More';
 import { Scan } from './ui/qr/Scan';
 import { UpdateBanner } from './ui/update/UpdateBanner';
 import { HistoryPage, SavedPlay, TodoPage } from './ui/history/History';
@@ -40,6 +40,8 @@ export function App() {
 
   const go = (h: string) => (location.hash = h);
   const home = () => go('#/');
+  // Random and saved puzzles, and the editor, are reached from "More ways to play".
+  const more = () => go('#/more');
   const parts = hash.replace(/^#\/?/, '').split('/');
 
   const play = (puzzle: Puzzle | null, source: 'local' | 'quick' | 'shared') =>
@@ -48,7 +50,7 @@ export function App() {
         key={puzzle.id + hash}
         puzzle={puzzle}
         source={source}
-        onHome={home}
+        onHome={source === 'shared' ? home : more}
         onEdit={source === 'local' ? () => go(`#/edit/${puzzle.id}`) : undefined}
         onRemix={() => {
           saveRemix(puzzle);
@@ -90,9 +92,12 @@ export function App() {
     const code = parts[1] ? normaliseCode(parts[1]) : null;
     page = code ? <Duel key={code} code={code} wantHost={parts[2] === 'host'} go={go} /> : <DuelStart go={go} />;
   } else if (parts[0] === 'edit') {
-    page = <Editor key={parts[1]} id={parts[1] || 'new'} onHome={home} onPlay={(id) => go(`#/play/local/${id}`)} />;
+    page = <Editor key={parts[1]} id={parts[1] || 'new'} onHome={more} onPlay={(id) => go(`#/play/local/${id}`)} />;
+  } else if (parts[0] === 'more') {
+    page = <More go={go} />;
   } else {
-    page = <Home go={go} />;
+    // The start page: today's daily puzzles.
+    page = <DailyHome go={go} />;
   }
 
   return (

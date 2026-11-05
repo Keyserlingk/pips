@@ -422,7 +422,7 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
 
   const leave = () => {
     if (s.phase === 'playing' && !confirm('Leave the duel? The round will be cancelled.')) return;
-    go('#/');
+    go('#/more');
   };
 
   const copyInvite = async () => {
@@ -609,7 +609,7 @@ export function Duel({ code, wantHost, go }: { code: string; wantHost: boolean; 
               ) : (
                 <span className="muted small">Waiting for {oppName} to start the next round…</span>
               )}
-              <button className="btn ghost" onClick={() => go('#/')}>
+              <button className="btn ghost" onClick={() => go('#/more')}>
                 Leave
               </button>
             </div>

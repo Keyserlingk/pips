@@ -105,7 +105,7 @@ function WebScan({ go }: { go: (hash: string) => void }) {
   return (
     <div className="scan">
       <div className="play-bar">
-        <button className="btn ghost" onClick={() => go('#/')}>
+        <button className="btn ghost" onClick={() => go('#/more')}>
           ← Back
         </button>
         <strong>Scan a puzzle</strong>
