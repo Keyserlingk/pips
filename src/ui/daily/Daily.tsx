@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
 import { DEFAULT_OPTIONS } from '../../model/types';
-import { dailyId, dailySeed, formatDay, todayKey } from '../../model/daily';
+import { dailyId, dailySeed, formatDay, solvedDayTimes, todayKey } from '../../model/daily';
+import { dayResultText } from '../../model/result';
+import { pageUrl } from '../../model/site';
 import { PLAYABLE_LEVELS, levelLabel } from '../../model/levels';
 import { loadDaily, loadProgress, saveDaily } from '../../model/storage';
 import { runEngine } from '../../engine/client';
@@ -65,15 +67,35 @@ export const dailyTimeToday = () => PLAYABLE_LEVELS.reduce((sum, l) => sum + dai
 
 /** Total time on today's four puzzles; shown once one has been started. */
 function DailyTotal() {
+  const [copied, setCopied] = useState<string | null>(null);
   const solved = solvedToday();
   const seconds = dailyTimeToday();
   if (!seconds) return null;
   const all = solved === PLAYABLE_LEVELS.length;
+  const shareDay = async () => {
+    const times = solvedDayTimes(todayKey());
+    if (!times) return;
+    try {
+      await navigator.clipboard.writeText(dayResultText(todayKey(), times, pageUrl()));
+      setCopied('Result copied');
+    } catch {
+      setCopied('Could not copy the result');
+    }
+    setTimeout(() => setCopied(null), 1800);
+  };
   return (
     <p className="daily-total center">
       {all ? 'All four solved in ' : 'Total today: '}
       <strong>{formatTime(seconds)}</strong>
       {!all && <span className="muted"> · {solved}/{PLAYABLE_LEVELS.length} solved</span>}
+      {all && (
+        <>
+          <br />
+          <button className="btn share-day" onClick={shareDay}>
+            {copied ?? '📋 Share result'}
+          </button>
+        </>
+      )}
     </p>
   );
 }

@@ -33,14 +33,29 @@ export function puzzleName(p: Puzzle): string {
   return p.title ? `“${p.title}”` : 'the puzzle';
 }
 
+/** "2026-11-05" → " 5/11/26", the date as shared results write it. */
+const shareDate = (y: string, m: string, d: string) => ` ${Number(d)}/${Number(m)}/${y.slice(-2)}`;
+
 /** The shared result line, plus a link to the puzzle on the next line when there is one. */
 export function resultText(p: Puzzle, seconds: number, link: string | null): string {
   const daily = DAILY_ID.exec(p.id);
   // Only a daily puzzle is dated (by its own day): it is the one friends can compare on.
-  const date = daily ? ` ${Number(daily[3])}/${Number(daily[2])}/${daily[1].slice(-2)}` : '';
+  const date = daily ? shareDate(daily[1], daily[2], daily[3]) : '';
   const level = p.difficulty ? levelLabel(p.difficulty).toLowerCase() : '';
   const what = [daily ? 'daily' : '', level].filter(Boolean).join(' ') || p.title || 'puzzle';
   const emoji = p.difficulty ? ` ${LEVEL_EMOJI[p.difficulty]}` : '';
   const line = `${SHARE_NAME}${date} ${what} in ${duration(seconds, true)}${emoji}`;
   return link ? `${line}\n${link}` : line;
+}
+
+/**
+ * The shared result for a whole day of daily puzzles, once every level is solved:
+ * "erkpips 5/11/26 daily all 4 in 12min 3s" and each level's time on the next line.
+ */
+export function dayResultText(date: string, times: [Difficulty, number][], link: string | null): string {
+  const [y, m, d] = date.split('-');
+  const total = times.reduce((sum, [, s]) => sum + s, 0);
+  const line = `${SHARE_NAME}${shareDate(y, m, d)} daily all ${times.length} in ${duration(total, true)}`;
+  const levels = times.map(([level, s]) => `${LEVEL_EMOJI[level]} ${duration(s, true)}`).join(' · ');
+  return [line, levels, link].filter(Boolean).join('\n');
 }

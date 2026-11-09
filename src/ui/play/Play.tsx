@@ -4,7 +4,8 @@ import { DIRS, add, constraintRule, evaluate, key, newId, ruleKey, sameCell } fr
 import { type Orient, type PlayState, type Snapshot, getPuzzle, loadProgress, savePuzzle, saveProgress } from '../../model/storage';
 import { samePuzzle, shareUrl } from '../../model/serialize';
 import { canShareSeed, puzzleLink } from '../../model/seedLink';
-import { duration, praise, puzzleName, resultText } from '../../model/result';
+import { dayResultText, duration, praise, puzzleName, resultText } from '../../model/result';
+import { solvedDayTimes } from '../../model/daily';
 import { pageUrl } from '../../model/site';
 import { GENERATOR_VERSION } from '../../engine/version';
 import { runEngine } from '../../engine/client';
@@ -452,6 +453,17 @@ export function Play({
       flash('Could not copy the result');
     }
   };
+  // Solving the last of a day's daily puzzles also offers the whole day's result.
+  const dayDate = source === 'daily' ? /^daily-(\d{4}-\d{2}-\d{2})-/.exec(puzzle.id)?.[1] : undefined;
+  const dayTimes = dayDate && st.solved ? solvedDayTimes(dayDate) : null;
+  const shareDay = async () => {
+    try {
+      await navigator.clipboard.writeText(dayResultText(dayDate!, dayTimes!, pageUrl()));
+      flash('Result copied');
+    } catch {
+      flash('Could not copy the result');
+    }
+  };
 
   const share = async (full: boolean) => {
     try {
@@ -676,6 +688,11 @@ export function Play({
               <button className="btn" onClick={shareResult}>
                 📋 Share result
               </button>
+              {dayTimes && (
+                <button className="btn" onClick={shareDay}>
+                  📋 Share all {dayTimes.length}
+                </button>
+              )}
               <button className="btn ghost" onClick={onHome}>
                 Home
               </button>

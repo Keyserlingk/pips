@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { duration, praise, puzzleName, resultText } from './result';
-import { DEFAULT_OPTIONS, type Puzzle } from './types';
+import { dayResultText, duration, praise, puzzleName, resultText } from './result';
+import { DEFAULT_OPTIONS, type Difficulty, type Puzzle } from './types';
 
 const puzzle = (over: Partial<Puzzle>): Puzzle => ({
   version: 1,
@@ -30,6 +30,13 @@ describe('result', () => {
   it('dates a daily puzzle by its own day, and says it is the daily', () => {
     const daily = puzzle({ id: 'daily-2026-11-05-expert', difficulty: 'expert' });
     expect(resultText(daily, 61, null)).toBe('erkpips 5/11/26 daily rachel in 1min 1s ⚫');
+  });
+
+  it('shares a whole day of daily puzzles with the total and each level', () => {
+    const times: [Difficulty, number][] = [['easy', 62], ['medium', 123], ['hard', 240], ['expert', 301]];
+    expect(dayResultText('2026-11-05', times, 'https://x/')).toBe(
+      'erkpips 5/11/26 daily all 4 in 12min 6s\n🟢 1min 2s · 🟠 2min 3s · 🔴 4min 0s · ⚫ 5min 1s\nhttps://x/',
+    );
   });
 
   it('names the puzzle in the message', () => {

@@ -1,4 +1,6 @@
 import type { Difficulty } from './types';
+import { PLAYABLE_LEVELS } from './levels';
+import { loadProgress } from './storage';
 
 /*
  * Daily puzzles: one per level, the same for everyone on a given date. The
@@ -32,4 +34,15 @@ export const dailyId = (date: string, level: Difficulty) => `daily-${date}-${lev
 export function formatDay(date: string): string {
   const [y, m, d] = date.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+/** Each level's time on a date's daily puzzles, once all of them are solved on this device; else null. */
+export function solvedDayTimes(date: string): [Difficulty, number][] | null {
+  const times: [Difficulty, number][] = [];
+  for (const level of PLAYABLE_LEVELS) {
+    const p = loadProgress(dailyId(date, level));
+    if (!p?.solved) return null;
+    times.push([level, p.elapsed]);
+  }
+  return times;
 }
