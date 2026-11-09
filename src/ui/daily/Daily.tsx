@@ -73,10 +73,9 @@ function DailyTotal() {
   if (!seconds) return null;
   const all = solved === PLAYABLE_LEVELS.length;
   const shareDay = async () => {
-    const times = solvedDayTimes(todayKey());
-    if (!times) return;
     try {
-      await navigator.clipboard.writeText(dayResultText(todayKey(), times, pageUrl()));
+      const times = solvedDayTimes(todayKey());
+      await navigator.clipboard.writeText(dayResultText(todayKey(), times, PLAYABLE_LEVELS.length, pageUrl()));
       setCopied('Result copied');
     } catch {
       setCopied('Could not copy the result');
@@ -88,7 +87,7 @@ function DailyTotal() {
       {all ? 'All four solved in ' : 'Total today: '}
       <strong>{formatTime(seconds)}</strong>
       {!all && <span className="muted"> · {solved}/{PLAYABLE_LEVELS.length} solved</span>}
-      {all && (
+      {solved > 0 && (
         <>
           <br />
           <button className="btn share-day" onClick={shareDay}>

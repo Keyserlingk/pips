@@ -49,13 +49,14 @@ export function resultText(p: Puzzle, seconds: number, link: string | null): str
 }
 
 /**
- * The shared result for a whole day of daily puzzles, once every level is solved:
- * "erkpips 5/11/26 daily all 4 in 12min 3s" and each level's time on the next line.
+ * The shared result for the daily puzzles solved so far on a date: "erkpips 5/11/26 daily
+ * 2/4 in 3min 5s" ("all 4" once every level is done) and each level's time on the next line.
  */
-export function dayResultText(date: string, times: [Difficulty, number][], link: string | null): string {
+export function dayResultText(date: string, times: [Difficulty, number][], of: number, link: string | null): string {
   const [y, m, d] = date.split('-');
   const total = times.reduce((sum, [, s]) => sum + s, 0);
-  const line = `${SHARE_NAME}${shareDate(y, m, d)} daily all ${times.length} in ${duration(total, true)}`;
+  const count = times.length === of ? `all ${of}` : `${times.length}/${of}`;
+  const line = `${SHARE_NAME}${shareDate(y, m, d)} daily ${count} in ${duration(total, true)}`;
   const levels = times.map(([level, s]) => `${LEVEL_EMOJI[level]} ${duration(s, true)}`).join(' · ');
   return [line, levels, link].filter(Boolean).join('\n');
 }

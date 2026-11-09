@@ -154,10 +154,15 @@ html.native-scan .top, html.native-scan .update-banner { visibility: hidden; }
 .scan-frame { position: absolute; inset: 18%; border: 3px solid #fff; border-radius: 16px; box-shadow: 0 0 0 999px rgb(0 0 0 / 0.35); }
 /* App update offer (Android app only). */
 .update-banner {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; margin: 0 0 14px;
-  padding: 10px 14px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border);
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 16px; margin: 0 0 16px;
+  padding: 18px 20px; border-radius: 18px; background: var(--accent); color: var(--accent-text);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.18); text-align: center;
 }
-.update-banner .btn { text-decoration: none; }
+.update-banner .update-text { font-size: 1.2rem; }
+.update-banner .row { display: flex; gap: 10px; }
+.update-banner .btn { text-decoration: none; font-size: 1.05rem; padding: 10px 22px; }
+.update-banner .btn:not(.ghost) { background: var(--accent-text); border-color: var(--accent-text); color: var(--accent); }
+.update-banner .btn.ghost { color: var(--accent-text); border-color: var(--accent-text); }
 /* History, to do, and the solved-games calendar (GitHub-style). */
 .history { display: flex; flex-direction: column; gap: 14px; max-width: 760px; margin: 0 auto; }
 .history-tabs button.on { background: var(--text); color: var(--bg); }

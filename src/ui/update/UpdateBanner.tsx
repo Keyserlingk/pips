@@ -3,7 +3,7 @@ import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { checkForUpdate, dismissUpdate } from '../../model/updates';
 
-/** Android app only: offers a newer release from GitHub (checked at most once a day). */
+/** Android app only: offers a newer release from GitHub, checked at start (at most once an hour). */
 export function UpdateBanner() {
   const [update, setUpdate] = useState<{ version: string; url: string } | null>(null);
 
@@ -22,21 +22,23 @@ export function UpdateBanner() {
   if (!update) return null;
   return (
     <div className="update-banner" role="status">
-      <span>
-        <strong>Pips {update.version}</strong> is available.
+      <span className="update-text">
+        🎉 <strong>Pips {update.version}</strong> is available!
       </span>
-      <a className="btn" href={update.url} target="_blank" rel="noreferrer" onClick={() => setUpdate(null)}>
-        Download
-      </a>
-      <button
-        className="btn ghost"
-        onClick={() => {
-          dismissUpdate();
-          setUpdate(null);
-        }}
-      >
-        Later
-      </button>
+      <div className="row">
+        <a className="btn" href={update.url} target="_blank" rel="noreferrer" onClick={() => setUpdate(null)}>
+          Download
+        </a>
+        <button
+          className="btn ghost"
+          onClick={() => {
+            dismissUpdate();
+            setUpdate(null);
+          }}
+        >
+          Later
+        </button>
+      </div>
     </div>
   );
 }

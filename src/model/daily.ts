@@ -36,13 +36,12 @@ export function formatDay(date: string): string {
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-/** Each level's time on a date's daily puzzles, once all of them are solved on this device; else null. */
-export function solvedDayTimes(date: string): [Difficulty, number][] | null {
+/** Each solved level's time on a date's daily puzzles (on this device), easiest first. */
+export function solvedDayTimes(date: string): [Difficulty, number][] {
   const times: [Difficulty, number][] = [];
   for (const level of PLAYABLE_LEVELS) {
     const p = loadProgress(dailyId(date, level));
-    if (!p?.solved) return null;
-    times.push([level, p.elapsed]);
+    if (p?.solved) times.push([level, p.elapsed]);
   }
   return times;
 }

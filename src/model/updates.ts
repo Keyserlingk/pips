@@ -1,13 +1,16 @@
 import { type UpdateState, loadUpdateState, saveUpdateState } from './storage';
 
 /*
- * Update check for the Android app: at most once a day it asks GitHub for the
+ * Update check for the Android app: at most once an hour it asks GitHub for the
  * latest release and compares its tag (v1.2) with the installed version.
  * The website needs none of this: it is always the latest.
  */
 
 const LATEST_RELEASE = 'https://api.github.com/repos/Keyserlingk/pips/releases/latest';
-const DAY = 24 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+/** The app checks when it starts, but asks GitHub at most this often. */
+const CHECK_EVERY = HOUR;
 const TIMEOUT_MS = 8000;
 
 /** "1.2" or "v1.2.3" → [1, 2] / [1, 2, 3]; anything else (a "dev-…" build) → null. */
@@ -35,11 +38,11 @@ export function pendingUpdate(state: UpdateState | null, current: string, now: n
   return latest;
 }
 
-/** Asks GitHub if a day has passed since the last time; quietly gives up when offline. */
+/** Asks GitHub if an hour has passed since the last time; quietly gives up when offline. */
 export async function checkForUpdate(current: string, now = Date.now()) {
   if (!parseVersion(current)) return null; // development builds don't update
   let state = loadUpdateState();
-  if (!state || now - state.checkedAt >= DAY) {
+  if (!state || now - state.checkedAt >= CHECK_EVERY) {
     try {
       const res = await fetch(LATEST_RELEASE, { headers: { Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(TIMEOUT_MS) });
       if (res.ok) {
@@ -48,7 +51,7 @@ export async function checkForUpdate(current: string, now = Date.now()) {
         saveUpdateState(state);
       }
     } catch {
-      // Offline or GitHub unreachable: try again next start.
+      // Offline or GitHub unreachable: try again next time.
     }
   }
   return pendingUpdate(state, current, now);

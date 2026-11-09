@@ -9,7 +9,7 @@ import { solvedDayTimes } from '../../model/daily';
 import { pageUrl } from '../../model/site';
 import { GENERATOR_VERSION } from '../../engine/version';
 import { runEngine } from '../../engine/client';
-import { levelClass, levelLabel } from '../../model/levels';
+import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
 import { Board, type BoardDomino, boardFrame, boardPoint, cellAt, cellPixels } from '../board/Board';
 import { DominoShape, S } from '../board/DominoShape';
 import { QrModal } from '../qr/QrModal';
@@ -453,12 +453,12 @@ export function Play({
       flash('Could not copy the result');
     }
   };
-  // Solving the last of a day's daily puzzles also offers the whole day's result.
+  // Once two or more of a day's daily puzzles are solved, the Solved box also offers them together.
   const dayDate = source === 'daily' ? /^daily-(\d{4}-\d{2}-\d{2})-/.exec(puzzle.id)?.[1] : undefined;
-  const dayTimes = dayDate && st.solved ? solvedDayTimes(dayDate) : null;
+  const dayTimes = dayDate && st.solved ? solvedDayTimes(dayDate) : [];
   const shareDay = async () => {
     try {
-      await navigator.clipboard.writeText(dayResultText(dayDate!, dayTimes!, pageUrl()));
+      await navigator.clipboard.writeText(dayResultText(dayDate!, dayTimes, PLAYABLE_LEVELS.length, pageUrl()));
       flash('Result copied');
     } catch {
       flash('Could not copy the result');
@@ -688,9 +688,9 @@ export function Play({
               <button className="btn" onClick={shareResult}>
                 📋 Share result
               </button>
-              {dayTimes && (
+              {dayTimes.length > 1 && (
                 <button className="btn" onClick={shareDay}>
-                  📋 Share all {dayTimes.length}
+                  📋 Share {dayTimes.length === PLAYABLE_LEVELS.length ? 'all' : `${dayTimes.length} of`} {PLAYABLE_LEVELS.length}
                 </button>
               )}
               <button className="btn ghost" onClick={onHome}>
