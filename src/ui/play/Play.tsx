@@ -64,6 +64,13 @@ export interface RaceHooks {
   onSolved: (placed: PlayState['placed'], ms: number) => void;
 }
 
+/** What the Solved box offers to play next, e.g. the next daily puzzle or another random one. */
+export interface NextUp {
+  label: string;
+  /** May take a while (a new puzzle being generated): the button waits for it. */
+  run: () => void | Promise<void>;
+}
+
 /** Is this puzzle in the library, and is the stored copy the same as this one? */
 function libraryState(puzzle: Puzzle): SavedState {
   const stored = getPuzzle(puzzle.id);
@@ -77,6 +84,8 @@ export function Play({
   onEdit,
   onRemix,
   race,
+  next,
+  dayComplete,
 }: {
   puzzle: Puzzle;
   /** Where the puzzle came from: the library, a random puzzle, a share link, or the daily set. */
@@ -86,6 +95,9 @@ export function Play({
   onRemix?: () => void;
   /** Present during a race: no saving, sharing or revealing, and a shared clock. */
   race?: RaceHooks;
+  next?: NextUp | null;
+  /** A daily puzzle whose solve completes the day's set: the Solved box celebrates and offers sharing them all. */
+  dayComplete?: boolean;
 }) {
   const [savedState, setSavedState] = useState<SavedState>(() => libraryState(puzzle));
   const [solution, setSolution] = useState(puzzle.solution);
@@ -455,7 +467,30 @@ export function Play({
   };
   // Once two or more of a day's daily puzzles are solved, the Solved box also offers them together.
   const dayDate = source === 'daily' ? /^daily-(\d{4}-\d{2}-\d{2})-/.exec(puzzle.id)?.[1] : undefined;
-  const dayTimes = dayDate && st.solved ? solvedDayTimes(dayDate) : [];
+  const dayTimes = useMemo(() => {
+    if (!dayDate || !st.solved) return [];
+    const times = solvedDayTimes(dayDate);
+    // This solve may not be stored yet when the box first shows.
+    const level = /-([a-z]+)$/.exec(puzzle.id)?.[1];
+    if (level && !times.some(([l]) => l === level)) {
+      times.push([level as (typeof times)[number][0], st.elapsed]);
+      times.sort(([a], [b]) => PLAYABLE_LEVELS.indexOf(a) - PLAYABLE_LEVELS.indexOf(b));
+    }
+    return times;
+  }, [dayDate, st.solved, st.elapsed, puzzle.id]);
+  const dayTotal = dayTimes.reduce((sum, [, s]) => sum + s, 0);
+  const [nextBusy, setNextBusy] = useState(false);
+  const playNext = async () => {
+    if (!next) return;
+    setNextBusy(true);
+    try {
+      await next.run();
+    } catch {
+      flash('Could not make a new puzzle');
+    } finally {
+      setNextBusy(false);
+    }
+  };
   const shareDay = async () => {
     try {
       await navigator.clipboard.writeText(dayResultText(dayDate!, dayTimes, PLAYABLE_LEVELS.length, pageUrl()));
@@ -667,11 +702,33 @@ export function Play({
 
       {st.solved && !dismissed && !race && (
         <div className="modal-backdrop">
-          <div className="modal">
-            <h2>{cheer}</h2>
-            <p>
-              You finished {puzzleName(puzzle)} in <strong>{duration(st.elapsed)}</strong>.
-            </p>
+          <div className={dayComplete ? 'modal day-complete' : 'modal'}>
+            {dayComplete ? (
+              <>
+                <div className="confetti" aria-hidden>
+                  🎉
+                </div>
+                <h2>Amazing!</h2>
+                <p>
+                  You finished all of the day's daily puzzles in <strong>{duration(dayTotal)}</strong>.
+                </p>
+                <ul className="day-times">
+                  {dayTimes.map(([level, s]) => (
+                    <li key={level}>
+                      <span className={`pill ${levelClass(level)}`}>{levelLabel(level)}</span>
+                      <span>{duration(s)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <>
+                <h2>{cheer}</h2>
+                <p>
+                  You finished {puzzleName(puzzle)} in <strong>{duration(st.elapsed)}</strong>.
+                </p>
+              </>
+            )}
             {solveId && (
               <div className="rate">
                 <span className="muted small">Rate this puzzle (optional)</span>
@@ -684,14 +741,29 @@ export function Play({
                 />
               </div>
             )}
-            <div className="row">
-              <button className="btn" onClick={shareResult}>
-                📋 Share result
-              </button>
-              {dayTimes.length > 1 && (
-                <button className="btn" onClick={shareDay}>
-                  📋 Share {dayTimes.length === PLAYABLE_LEVELS.length ? 'all' : `${dayTimes.length} of`} {PLAYABLE_LEVELS.length}
+            {next && !dayComplete && (
+              <div className="row next-up">
+                <button className="btn big" onClick={playNext} disabled={nextBusy}>
+                  {nextBusy ? 'Generating…' : next.label}
                 </button>
+              </div>
+            )}
+            <div className="row">
+              {dayComplete ? (
+                <button className="btn big" onClick={shareDay}>
+                  📋 Share all {PLAYABLE_LEVELS.length}
+                </button>
+              ) : (
+                <>
+                  <button className={next ? 'btn ghost' : 'btn'} onClick={shareResult}>
+                    📋 Share result
+                  </button>
+                  {dayTimes.length > 1 && (
+                    <button className={next ? 'btn ghost' : 'btn'} onClick={shareDay}>
+                      📋 Share {dayTimes.length} of {PLAYABLE_LEVELS.length}
+                    </button>
+                  )}
+                </>
               )}
               <button className="btn ghost" onClick={onHome}>
                 Home

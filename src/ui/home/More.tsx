@@ -2,14 +2,12 @@ import { useRef, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
 import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
 import { MenuButton, MenuItem } from '../Menu';
-import { deletePuzzle, loadLibrary, loadTodo, saveProgress, savePuzzle, saveQuick } from '../../model/storage';
+import { deletePuzzle, loadLibrary, loadTodo, savePuzzle } from '../../model/storage';
 import { isPuzzle } from '../../model/serialize';
 import { QrModal } from '../qr/QrModal';
 import { newId } from '../../model/cells';
-import { runEngine } from '../../engine/client';
-import { randomSeed } from '../../engine/rng';
-import { GENERATOR_VERSION } from '../../engine/version';
-import { puzzleLink, randomPuzzle, seedOptions } from '../../model/seedLink';
+import { puzzleLink } from '../../model/seedLink';
+import { newRandomPuzzle } from './random';
 
 /** Shown while the slower levels generate (no time limit, so they can be shared as seed links). */
 export const WAIT: Partial<Record<Difficulty, string>> = { hard: ' (can take a few seconds)', expert: ' (can take up to a minute)' };
@@ -27,16 +25,8 @@ export function More({ go }: { go: (hash: string) => void }) {
   const quick = (difficulty: Difficulty) => {
     setBusy(difficulty);
     setError(null);
-    // Generated from a recorded seed without time limits, so it can be shared as a short seed link.
-    const recipe = { v: GENERATOR_VERSION, level: difficulty, seed: randomSeed(), extras: withExtras };
-    runEngine('quick', seedOptions(recipe))
-      .promise.then((res) => {
-        if (!res.ok) return setError(res.error);
-        const p = randomPuzzle(res, recipe);
-        saveQuick(p);
-        saveProgress(p.id, null);
-        go('#/play/quick');
-      })
+    newRandomPuzzle(difficulty, withExtras)
+      .then(() => go('#/play/quick'))
       .catch((e: Error) => setError(e.message))
       .finally(() => setBusy(null));
   };
@@ -84,7 +74,7 @@ export function More({ go }: { go: (hash: string) => void }) {
             </MenuItem>
           </MenuButton>
           <button className="btn ghost" onClick={() => go('#/history')}>
-            📅 History &amp; to do{todoCount ? ` (${todoCount})` : ''}
+            📅 History, to do &amp; insights{todoCount ? ` (${todoCount})` : ''}
           </button>
         </div>
         <label className="check extras-toggle">

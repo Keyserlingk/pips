@@ -33,7 +33,7 @@ export async function resolveRef(ref: PuzzleRef): Promise<Puzzle | null> {
   return p.origin!.fp === ref.origin.fp ? p : null;
 }
 
-function Tabs({ tab, go }: { tab: 'history' | 'todo'; go: (h: string) => void }) {
+export function Tabs({ tab, go }: { tab: 'history' | 'todo' | 'insights'; go: (h: string) => void }) {
   const todo = loadTodo().length;
   return (
     <div className="play-bar">
@@ -46,6 +46,9 @@ function Tabs({ tab, go }: { tab: 'history' | 'todo'; go: (h: string) => void })
         </button>
         <button className={tab === 'todo' ? 'on' : ''} onClick={() => go('#/todo')}>
           To do{todo ? ` (${todo})` : ''}
+        </button>
+        <button className={tab === 'insights' ? 'on' : ''} onClick={() => go('#/insights')}>
+          Insights
         </button>
       </div>
       <span />

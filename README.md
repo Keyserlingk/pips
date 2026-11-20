@@ -37,6 +37,11 @@ Other scripts: `npm test` (engine tests), `npm run build` (static build in `dist
   rating, under a GitHub-style calendar of games per day; tap a game to revisit it. **📌 To do** sets a puzzle
   aside; solving it moves it to the history. Entries store a random puzzle's seed, a daily puzzle's date, or
   else the compressed puzzle, so they can always be reopened.
+- **Daily puzzles**: swipe sideways (or tap the level strip) to move between the day's four puzzles; each keeps
+  its own timer. After a solve, **Next** opens the easiest one still to do; finishing the last one shows the
+  whole day with **Share all 4**. Random puzzles offer **Another <level>** instead.
+- **Insights** (next to History) charts the history: time to solve per level over time with a 5-solve average,
+  total time on each day's daily puzzles, and the hour of day you play, plus best and average times per level.
 - **Share ▾ → Show QR code** shows the same link as a QR code. **📷 Scan QR code** on the home screen reads one
   with the camera and opens the puzzle on the device, so the app can pass puzzles on without internet.
 

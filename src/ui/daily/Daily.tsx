@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Difficulty, Puzzle } from '../../model/types';
 import { DEFAULT_OPTIONS } from '../../model/types';
 import { dailyId, dailySeed, formatDay, solvedDayTimes, todayKey } from '../../model/daily';
 import { dayResultText } from '../../model/result';
 import { pageUrl } from '../../model/site';
-import { PLAYABLE_LEVELS, levelLabel } from '../../model/levels';
+import { PLAYABLE_LEVELS, levelClass, levelLabel } from '../../model/levels';
 import { loadDaily, loadProgress, saveDaily } from '../../model/storage';
 import { runEngine } from '../../engine/client';
 import { Play } from '../play/Play';
@@ -164,8 +164,84 @@ export function DailyHome({ go }: { go: (hash: string) => void }) {
 
 // ------------------------------------------------- #/daily/<date>/<level>
 
+/** Which way the last switch between a day's puzzles went, so the new one slides in from that side. */
+let slideFrom: 'left' | 'right' | null = null;
+
+/** A sideways swipe on the play screen, not a domino drag or a vertical scroll. */
+function useSwipe(ref: React.RefObject<HTMLElement>, onSwipe: (dir: 'left' | 'right') => void) {
+  const cb = useRef(onSwipe);
+  cb.current = onSwipe;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let start: { x: number; y: number; t: number } | null = null;
+    const down = (e: TouchEvent) => {
+      const t = e.touches[0];
+      // Play cancels touches that start on a domino on the board (they are drags), so does the tray.
+      const target = e.target as Element;
+      start =
+        e.touches.length === 1 && !e.defaultPrevented && !target.closest('.tray-domino, .parked, .menu, .modal-backdrop, .snapshots')
+          ? { x: t.clientX, y: t.clientY, t: Date.now() }
+          : null;
+    };
+    const up = (e: TouchEvent) => {
+      if (!start || document.querySelector('.drag-ghost')) return (start = null);
+      const t = e.changedTouches[0];
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      const quick = Date.now() - start.t < 700;
+      start = null;
+      if (quick && Math.abs(dx) > 60 && Math.abs(dx) > 1.8 * Math.abs(dy)) cb.current(dx < 0 ? 'left' : 'right');
+    };
+    el.addEventListener('touchstart', down, { passive: true });
+    el.addEventListener('touchend', up, { passive: true });
+    el.addEventListener('touchcancel', () => (start = null));
+    return () => {
+      el.removeEventListener('touchstart', down);
+      el.removeEventListener('touchend', up);
+    };
+  }, [ref]);
+}
+
+/** The day's levels as dots: shows where you are, and taps through to the others. */
+function LevelStrip({ date, level, open }: { date: string; level: Difficulty; open: (l: Difficulty) => void }) {
+  const i = PLAYABLE_LEVELS.indexOf(level);
+  const prev = PLAYABLE_LEVELS[i - 1];
+  const nextLevel = PLAYABLE_LEVELS[i + 1];
+  return (
+    <nav className="level-strip" aria-label="Today's puzzles">
+      <button className="link-arrow" disabled={!prev} onClick={() => prev && open(prev)} aria-label={prev ? `Previous: ${levelLabel(prev)}` : undefined}>
+        ‹
+      </button>
+      {PLAYABLE_LEVELS.map((l) => {
+        const status = dailyStatus(date, l).state;
+        return (
+          <button
+            key={l}
+            className={`level-dot ${levelClass(l)}${l === level ? ' on' : ''}${status === 'solved' ? ' solved' : ''}`}
+            onClick={() => l !== level && open(l)}
+            aria-current={l === level ? 'page' : undefined}
+          >
+            {status === 'solved' ? '✓ ' : ''}
+            {levelLabel(l)}
+          </button>
+        );
+      })}
+      <button className="link-arrow" disabled={!nextLevel} onClick={() => nextLevel && open(nextLevel)} aria-label={nextLevel ? `Next: ${levelLabel(nextLevel)}` : undefined}>
+        ›
+      </button>
+    </nav>
+  );
+}
+
 export function DailyPlay({ date, level, go }: { date: string; level: Difficulty; go: (hash: string) => void }) {
   const [puzzle, setPuzzle] = useState<Puzzle | null | 'error'>(() => loadDaily(date, level));
+  const [slide] = useState(() => {
+    const s = slideFrom;
+    slideFrom = null;
+    return s;
+  });
+  const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (puzzle) return;
     let live = true;
@@ -178,8 +254,24 @@ export function DailyPlay({ date, level, go }: { date: string; level: Difficulty
     };
   }, [date, level, puzzle]);
 
+  // Switching between a day's puzzles replaces the page, so Back still goes to the start page.
+  const open = (l: Difficulty) => {
+    slideFrom = PLAYABLE_LEVELS.indexOf(l) > PLAYABLE_LEVELS.indexOf(level) ? 'right' : 'left';
+    location.replace(`#/daily/${date}/${l}`);
+  };
+  const i = PLAYABLE_LEVELS.indexOf(level);
+  useSwipe(wrapRef, (dir) => {
+    const to = PLAYABLE_LEVELS[dir === 'left' ? i + 1 : i - 1];
+    if (to) open(to);
+  });
+
+  // After a solve: the easiest of the day's puzzles still to do, or the celebration once they are all done.
+  const remaining = PLAYABLE_LEVELS.filter((l) => l !== level && dailyStatus(date, l).state !== 'solved');
+  const nextLevel = remaining[0];
+
+  let body: JSX.Element;
   if (puzzle === 'error')
-    return (
+    body = (
       <section className="panel">
         <p>Could not prepare this puzzle.</p>
         <button className="btn" onClick={() => go('#/daily')}>
@@ -187,11 +279,27 @@ export function DailyPlay({ date, level, go }: { date: string; level: Difficulty
         </button>
       </section>
     );
-  if (!puzzle)
-    return (
+  else if (!puzzle)
+    body = (
       <section className="panel center">
         <span className="spinner" /> Preparing the daily {levelLabel(level)} puzzle…
       </section>
     );
-  return <Play key={puzzle.id} puzzle={puzzle} source="daily" onHome={() => go('#/')} />;
+  else
+    body = (
+      <Play
+        key={puzzle.id}
+        puzzle={puzzle}
+        source="daily"
+        onHome={() => go('#/')}
+        next={nextLevel ? { label: `Next: ${levelLabel(nextLevel)} →`, run: () => open(nextLevel) } : null}
+        dayComplete={!nextLevel}
+      />
+    );
+  return (
+    <div ref={wrapRef} className={`daily-play${slide ? ` slide-from-${slide}` : ''}`}>
+      <LevelStrip date={date} level={level} open={open} />
+      {body}
+    </div>
+  );
 }

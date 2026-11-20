@@ -8,12 +8,14 @@ import { Scan } from './ui/qr/Scan';
 import { UpdateBanner } from './ui/update/UpdateBanner';
 import { HistoryPage, SavedPlay, TodoPage } from './ui/history/History';
 import { Play } from './ui/play/Play';
+import { InsightsPage } from './ui/history/Insights';
 import { Editor } from './ui/editor/Editor';
 import { Duel, DuelStart } from './ui/duel/Duel';
 import { GhostChallenge, GhostStart } from './ui/ghost/Ghost';
 import { DailyHome, DailyPlay } from './ui/daily/Daily';
 import { isDateKey } from './model/daily';
-import { PLAYABLE_LEVELS } from './model/levels';
+import { PLAYABLE_LEVELS, levelLabel } from './model/levels';
+import { newRandomPuzzle } from './ui/home/random';
 import type { Difficulty } from './model/types';
 import { normaliseCode } from './duel/protocol';
 import { decodeSeed, randomPuzzle, seedOptions } from './model/seedLink';
@@ -33,6 +35,8 @@ function useHash() {
 export function App() {
   const hash = useHash();
   const [theme, setTheme] = useState(loadTheme);
+  // A new random puzzle keeps the same address (#/play/quick): this redraws the page for it.
+  const [quickRound, setQuickRound] = useState(0);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     saveTheme(theme);
@@ -47,9 +51,20 @@ export function App() {
   const play = (puzzle: Puzzle | null, source: 'local' | 'quick' | 'shared') =>
     puzzle ? (
       <Play
-        key={puzzle.id + hash}
+        key={puzzle.id + hash + quickRound}
         puzzle={puzzle}
         source={source}
+        next={
+          source === 'quick' && puzzle.origin
+            ? {
+                label: `Another ${levelLabel(puzzle.origin.level)} →`,
+                run: async () => {
+                  await newRandomPuzzle(puzzle.origin!.level, puzzle.origin!.extras);
+                  setQuickRound((n) => n + 1);
+                },
+              }
+            : null
+        }
         onHome={source === 'shared' ? home : more}
         onEdit={source === 'local' ? () => go(`#/edit/${puzzle.id}`) : undefined}
         onRemix={() => {
@@ -62,7 +77,9 @@ export function App() {
     );
 
   let page: JSX.Element;
-  if (parts[0] === 'history') {
+  if (parts[0] === 'insights') {
+    page = <InsightsPage go={go} />;
+  } else if (parts[0] === 'history') {
     page = parts[1] ? <SavedPlay key={parts[1]} list="history" id={parts[1]} go={go} /> : <HistoryPage go={go} />;
   } else if (parts[0] === 'todo') {
     page = parts[1] ? <SavedPlay key={parts[1]} list="todo" id={parts[1]} go={go} /> : <TodoPage go={go} />;
